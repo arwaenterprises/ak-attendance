@@ -32,3 +32,29 @@ jobs:
           node baseline.test.js
           node update.test.js
           node smoke.test.js
+
+  database:
+    # Database security rules (supabase/migrations) tested on a throw-away Postgres: tests/db
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install psql
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Database security tests
+        run: bash tests/db/run.sh
