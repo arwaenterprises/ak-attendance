@@ -14,8 +14,8 @@ Rule for every task: do not break the existing workflow or architecture; test be
 
 | Step | What you do | Done? |
 |------|-------------|-------|
-| 12 | Pages source switched to GitHub Actions | Yes |
-| 13 | Nothing. I am publishing the app-only site through a merge to main and will verify it | - |
+| 14 | Security step S1 (database rules, tested) | Yes |
+| 15 | Reply "go" for S2: the app logs in through Supabase Auth on staging. I will first tell you in plain words what you will create in the Supabase dashboard (one test admin) | No |
 
 Parked, not forgotten: licence of the update icon picture (step 11).
 
@@ -111,6 +111,19 @@ My reading of your rule (please confirm, task 20): after a `login`, ANY punch wi
 |---|------|----------|--------|
 | 27 | Labor sees only their own month after face match + ID/PIN, served by a small database function (not direct table reads) | Medium | Todo, after tasks 29-31 |
 | 28 | Check free-tier limits and project pausing on the current Supabase pricing page (as I recall about 500 MB database, 1 GB storage, 5 GB transfer, pause after about a week idle; verify) | Medium | Todo |
+
+### 8. Security block (one step at a time; staging only until the final cutover)
+
+Design (decided by me, to confirm at step 2): users log in with **Supabase Auth** (secure, rate-limited, works on many devices at once). Each client has ONE admin. The database decides who the caller is from the Auth session and applies the rules from `supabase/migrations/001_security_foundation.sql`. The punch terminal (no login) gets its own narrow functions and a per-client terminal key (step 3).
+
+| # | Step | Severity | Status |
+|---|------|----------|--------|
+| S1 | Database rules: each client sees and changes only its own rows; public key gets nothing; password hashes unreadable; clients cannot edit subscriptions; audit log append-only; functions check the caller. File `supabase/migrations/001_security_foundation.sql`. **118 checks pass on a local Postgres 16** (`bash tests/db/run.sh`, also in CI); a deliberately loosened rule makes them fail. NOT applied to any Supabase project yet (it would stop the current app) | Critical | Done (tested locally) |
+| S2 | App login with Supabase Auth on staging; single admin per client; Users page removed; app pages work under the new rules; baseline tests moved to a logged-in test user | Critical | Todo |
+| S3 | Punch terminal: per-client terminal key + narrow functions (face data, settings, punch save, sync) so the terminal works without an open database | Critical | Todo |
+| S4 | Punch photos private (signed links); labor self-enrollment page through a safe function; storage rules | High | Todo |
+| S5 | Login attempt limits, audit review, remove the temporary open policies, **live cutover plan** (migrate the live admin accounts, switch the live project) with a rollback | Critical | Todo |
+
 
 ---
 
