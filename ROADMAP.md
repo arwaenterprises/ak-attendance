@@ -10,6 +10,27 @@ Rule for every task: do not break the existing workflow or architecture; test be
 
 ---
 
+## PROGRESS (updated after every finished task)
+
+**Overall: about 48% complete** (my estimate: the weights are judgement, not measurement)
+
+| Area (what you asked for) | Weight | Done | Status |
+|---|---|---|---|
+| App update popup, PWA install, offline, new update icon, rename to Dawam | 15% | 100% | Live |
+| Security: database closed, new login, terminal, private photos (S1-S4 done, **S5 live cutover left**) | 30% | 80% | Built and verified on staging; live cutover is S5 |
+| One admin per client, Users page removed, many devices | 5% | 70% | Works on staging; goes live with S5 |
+| IN / OUT punches, 4-hour lock, repeated / mismatched punch checks | 10% | 0% | Needs S5 first (it runs in the new terminal path) |
+| Shift management: Day / Night, assign labors, reports follow the shift | 20% | 0% | Not started |
+| Client (SaaS) management: platform-owner page | 10% | 0% | Not started |
+| Labor monthly attendance on the terminal | 5% | 0% | Not started |
+| Roadmap, schema files, automatic tests | 5% | 100% | Maintained every step |
+
+Rough number of remaining steps (each step = one exchange with you): S5 live cutover 3-4, IN/OUT + lock 2-3, Shift management 4-5, Platform-owner page 2-3, Monthly view 1-2.
+
+Why S5 comes before IN/OUT and the lock: those rules live in the new terminal path, which only runs after the live cutover.
+
+---
+
 ## NOW - your next step
 
 | Step | What you do | Done? |
