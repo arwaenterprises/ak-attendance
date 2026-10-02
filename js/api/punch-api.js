@@ -182,9 +182,8 @@ const PunchAPI = {
         try {
             const timestamp = Date.now();
             const fileName = `${laborId}_${timestamp}.jpg`;
-            // New login: photos live in a folder per company (the database only lets a terminal write into its own)
-            const newLogin = typeof DAWAM_AUTH_MODE !== 'undefined' && DAWAM_AUTH_MODE === 'supabase';
-            const filePath = newLogin ? `${AUTH.getClientId()}/punches/${fileName}` : `punches/${fileName}`;
+            // Photos live in a folder per company (the database only lets a terminal write into its own)
+            const filePath = `${AUTH.getClientId()}/punches/${fileName}`;
 
             const { data, error } = await supabaseClient.storage
                 .from('punch-photos')

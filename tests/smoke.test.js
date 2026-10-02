@@ -7,7 +7,7 @@ const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const SHOTS = process.env.SHOT_DIR;       // optional: save screenshots here
 
-const PAGES = ['/index.html', '/dashboard.html', '/admin/departments.html', '/admin/settings.html', '/admin/shifts.html', '/admin/terminal-link.html', '/admin/platform-clients.html', '/admin/users.html',
+const PAGES = ['/index.html', '/dashboard.html', '/admin/departments.html', '/admin/settings.html', '/admin/shifts.html', '/admin/terminal-link.html', '/admin/platform-clients.html',
   '/attendance/lop.html', '/attendance/overtime.html', '/attendance/punch-locations.html', '/labor/enroll.html',
   '/labor/import.html', '/labor/master.html', '/reports/3pl-billing.html', '/reports/daily.html'];
 

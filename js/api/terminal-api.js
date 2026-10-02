@@ -10,8 +10,6 @@ const TerminalAPI = {
     KEY_STORAGE: 'dawam_terminal_key',
     _cache: null,                  // last bootstrap result {time, data}
 
-    isNewLogin() { return typeof DAWAM_AUTH_MODE !== 'undefined' && DAWAM_AUTH_MODE === 'supabase'; },
-
     emailFor(clientCode) { return `terminal@${String(clientCode).toLowerCase().trim()}.${DAWAM_LOGIN_EMAIL_DOMAIN}`; },
 
     _storage(op, key, value) {

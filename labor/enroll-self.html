@@ -349,7 +349,6 @@
             ? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmRhZXlxc3N6b2FjcmlqbGRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA5NDg5OTksImV4cCI6MjEwNjUyNDk5OX0.h3Cb8TJfkppvpsmh65Zkb_0W0F3VxJf1O8ISpp7M5UA'
             : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt5a3R3endpcmFpcHd5Z2xraHZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwMTA2MTcsImV4cCI6MjA4NzU4NjYxN30.acOQWJkfE6Ew9PVyEKNeGxs7ri7QH_AarpPcoT34RBY';
         // This public page uses only enrollment_get / enrollment_submit and one photo upload (no table access).
-        const DAWAM_AUTH_MODE = 'supabase';
         const { createClient } = supabase;
         const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
     </script>
@@ -377,8 +376,8 @@
             // Validate token
             try {
                 let data, error;
-                if (DAWAM_AUTH_MODE === 'supabase') {
-                    // New login: ask the database function (it shows nothing else and works only with a valid link)
+                {
+                    // Ask the database function (it shows nothing else and works only with a valid link)
                     const res = await supabaseClient.rpc('enrollment_get', { p_token: token });
                     if (res.error || !res.data) { showError('Failed to validate link. Please try again.'); return; }
                     const r = res.data;
@@ -635,7 +634,7 @@
                 const blob = await response.blob();
 
                 // New login: one photo per link, in the company folder, named after the link; the database function stores the result
-                if (DAWAM_AUTH_MODE === 'supabase') {
+                {
                     const path = `${tokenData.clientId}/enrollment/${tokenData.token}.jpg`;
                     const up = await supabaseClient.storage.from('punch-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
                     if (up.error) throw up.error;
@@ -656,6 +655,6 @@
             }
         }
     </script>
-    <script src="../js/ui/app-update.js?v=89"></script>
+    <script src="../js/ui/app-update.js?v=90"></script>
 </body>
 </html>
