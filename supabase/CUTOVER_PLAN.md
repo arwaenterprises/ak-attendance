@@ -23,10 +23,10 @@ Decision (owner): use the same live Supabase project, keep only the attendance a
 
 ## Decided with the owner
 - AE1 admin: the existing admin `akhtar.ansari@ak.com.sa` becomes username `akhtaransari` (typed as AkhtarAnsari; the login ignores capitals). Same person, same history, new password set in Supabase Auth.
-- AE1 supervisors adel, hridoy, prodip (active) are retired; arif was already inactive.
+- AE1 supervisors adel, hridoy, prodip, arif are DELETED (one still named in an LOP approval or audit entry would stay, inactive).
+- AE2 and AE3 are DELETED with everything under them (owner's decision). AE1 keeps only the punch locations Kaden Warehouse and Sulay (a location with punches already recorded stays, switched off). Expired unused enrolment links are removed. Source: [000b_cleanup_live.sql](https://github.com/arwaenterprises/ak-attendance/blob/claude/cool-cannon-o7cbyn/supabase/live/000b_cleanup_live.sql). **These deletes are not undone by the rollback.**
 - Downtime accepted: 60-90 minutes.
 - Terminals: Kaden Warehouse is the main one (2073 punches in 30 days); Sulay (49) maybe. One terminal link per company, used on every device.
-- AE2 (Hadir, 1 laborer) and AE3 (0 laborers) each have one admin whose username is an email, so those two logins will NOT work after the cutover (no Auth accounts). Their data stays. Open question to the owner: give them short usernames too, or leave.
 
 ## Exact statements for step 3 (live SQL editor, after the bundle)
 ```sql
