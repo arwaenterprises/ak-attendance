@@ -23,34 +23,12 @@ const LIVE = 'kyktwzwiraipwyglkhva', STAGING = 'jbfdaeyqsszoacrijldk';
     const r = await page.evaluate(() => ({ db: SUPABASE_URL.replace('https://', '').split('.')[0], mode: DAWAM_AUTH_MODE }));
     await ctx.close(); return { ...r, dbCalls };
   };
-  await test('dawam.arwaenterprises.com -> LIVE database, old login', async () => eq(await check('dawam.arwaenterprises.com'), { db: LIVE, mode: 'legacy', dbCalls: 0 }));
-  await test('a look-alike address (dawam.arwaenterprises.com.evil.test) -> LIVE database, old login (never staging)', async () => eq(await check('dawam.arwaenterprises.com.evil.test'), { db: LIVE, mode: 'legacy', dbCalls: 0 }));
-  await test('any other address -> LIVE database, old login', async () => eq(await check('other.example.test'), { db: LIVE, mode: 'legacy', dbCalls: 0 }));
+  await test('dawam.arwaenterprises.com -> LIVE database, new login', async () => eq(await check('dawam.arwaenterprises.com'), { db: LIVE, mode: 'supabase', dbCalls: 0 }));
+  await test('a look-alike address (dawam.arwaenterprises.com.evil.test) -> LIVE database, new login (never staging)', async () => eq(await check('dawam.arwaenterprises.com.evil.test'), { db: LIVE, mode: 'supabase', dbCalls: 0 }));
+  await test('any other address -> LIVE database, new login', async () => eq(await check('other.example.test'), { db: LIVE, mode: 'supabase', dbCalls: 0 }));
   await test('staging.* address -> staging database, new login', async () => eq(await check('staging.example.test'), { db: STAGING, mode: 'supabase', dbCalls: 0 }));
   await test('localhost -> staging database, new login', async () => eq(await check('localhost'), { db: STAGING, mode: 'supabase', dbCalls: 0 }));
 
-  // The live site must keep working exactly as before: old login, no Supabase Auth calls. (The live database is FAKED here: no real request leaves the test.)
-  await test('live address: the old login still works and never calls Supabase Auth', async () => {
-    const ctx = await browser.newContext({ serviceWorkers: 'block' });
-    await curlRoutes(ctx, /jsdelivr/);
-    const seen = [];
-    await ctx.route(/supabase\.co/, async route => {
-      const u = route.request().url(), m = route.request().method(); seen.push(m + ' ' + new URL(u).pathname);
-      const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
-      if (m === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
-      if (u.includes('/rest/v1/clients')) return route.fulfill({ status: 200, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify({ id: 'c1', business_name: 'Fake Co', business_name_ar: null, logo_url: null, subscription_status: 'premium', subscription_tier: 'basic', subscription_end_date: null, is_active: true }) });
-      if (u.includes('/rest/v1/users')) return route.fulfill({ status: 200, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify({ id: 'u1', username: 'bob', password_hash: 'secret-pw', name: 'Bob', role: 'admin', department_id: null, status: 'active', client_id: 'c1', permissions: {} }) });
-      return route.fulfill({ status: 201, headers: cors, body: '' });
-    });
-    const page = await ctx.newPage();
-    await page.goto(`http://dawam.arwaenterprises.com:${port}/tests/harness.html`);
-    await page.waitForFunction(() => typeof AUTH !== 'undefined');
-    const good = await page.evaluate(() => AUTH.login('FAKE', 'bob', 'secret-pw'));
-    const bad = await page.evaluate(() => AUTH.login('FAKE', 'bob', 'wrong'));
-    eq([good.success, good.user && good.user.role, bad.success, bad.error], [true, 'admin', false, 'Invalid password'], 'old login behaviour');
-    eq(seen.filter(x => x.includes('/auth/v1')).length, 0, 'calls to the Auth service');
-    await ctx.close();
-  });
   await browser.close(); srv.close();
   process.exit(summary());
 })().catch(e => { console.error(e); process.exit(1); });

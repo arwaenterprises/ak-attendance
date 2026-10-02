@@ -92,7 +92,12 @@ check('supabase/staging-security-bundle.sql is up to date (run: node tools/build
 const termFile = path.join(ROOT, 'supabase/staging-terminal-bundle.sql');
 check('supabase/staging-terminal-bundle.sql is up to date (run: node tools/build-staging-bundle.js)',
   fs.existsSync(termFile) && fs.readFileSync(termFile, 'utf8') === require('../tools/build-staging-bundle.js').terminalBundle());
-check('live site keeps the old login until the cutover (DAWAM_AUTH_MODE is staging-only)', /DAWAM_AUTH_MODE\s*=\s*DAWAM_IS_STAGING\s*\?\s*'supabase'\s*:\s*'legacy'/.test(supaJs));
+const liveB = require('../tools/build-live-bundle.js');
+check('supabase/live/live-cutover-bundle.sql is up to date (run: node tools/build-live-bundle.js)',
+  fs.existsSync(path.join(ROOT, 'supabase/live/live-cutover-bundle.sql')) && fs.readFileSync(path.join(ROOT, 'supabase/live/live-cutover-bundle.sql'), 'utf8') === liveB.cutover());
+check('supabase/live/live-rollback-bundle.sql is up to date (run: node tools/build-live-bundle.js)',
+  fs.existsSync(path.join(ROOT, 'supabase/live/live-rollback-bundle.sql')) && fs.readFileSync(path.join(ROOT, 'supabase/live/live-rollback-bundle.sql'), 'utf8') === liveB.rollback());
+check('every host uses the new login (DAWAM_AUTH_MODE is supabase after the S5 cutover)', /DAWAM_AUTH_MODE\s*=\s*'supabase'/.test(supaJs));
 
 // version must be bumped when app files changed (CI sets BASE_SHA)
 const base = process.env.BASE_SHA;

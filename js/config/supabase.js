@@ -11,7 +11,7 @@ const SUPABASE_ANON_KEY = DAWAM_IS_STAGING
 
 // Login system. Staging uses the new Supabase Auth login (ROADMAP security step S2); the live site keeps the old login
 // until the planned cutover (S5). One place to switch: change this line when the live database is ready.
-const DAWAM_AUTH_MODE = DAWAM_IS_STAGING ? 'supabase' : 'legacy';
+const DAWAM_AUTH_MODE = 'supabase';
 // Login email = <username>@<company code>.<this domain>. The app builds it; nothing is ever sent to it.
 // Must match supabase/migrations/002_auth_login.sql (checked by tests/static-checks.js).
 const DAWAM_LOGIN_EMAIL_DOMAIN = 'dawam.arwaenterprises.com';

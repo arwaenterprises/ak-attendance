@@ -10,14 +10,39 @@ Rule for every task: do not break the existing workflow or architecture; test be
 
 ---
 
-## NOW - your next step
+## PROGRESS (updated after every finished task)
 
-| Step | What you do | Done? |
-|------|-------------|-------|
-| 22 | Staging: migration 006 applied (verified: 14 of 14 photo and self-enrollment checks on the real storage service) | Yes |
-| 23 | Next (S5, the last security step): the **live cutover plan**. Reply "go" and I will first explain in plain words what changes for your real users and what you must prepare | No |
+**Overall: about 52% complete** (my estimate: the weights are judgement, not measurement)
 
-Parked, not forgotten: licence of the update icon picture (step 11); LOP auto-drafts decision (finding 60).
+| Area (what you asked for) | Weight | Done | Status |
+|---|---|---|---|
+| App update popup, PWA install, offline, new update icon, rename to Dawam | 15% | 100% | Live |
+| Security: database closed, new login, terminal, private photos (S1-S4 done, **S5 live cutover left**) | 30% | 90% | Built and verified on staging; live cutover rehearsed locally, waiting for your OK |
+| One admin per client, Users page removed, many devices | 5% | 70% | Works on staging; goes live with S5 |
+| IN / OUT punches, 4-hour lock, repeated / mismatched punch checks | 10% | 0% | Needs S5 first (it runs in the new terminal path) |
+| Shift management: Day / Night, assign labors, reports follow the shift | 20% | 0% | Not started |
+| Client (SaaS) management: platform-owner page | 10% | 0% | Not started |
+| Labor monthly attendance on the terminal | 5% | 0% | Not started |
+| Roadmap, schema files, automatic tests | 5% | 100% | Maintained every step |
+
+Rough number of remaining steps (each step = one exchange with you): S5 live cutover 3-4, IN/OUT + lock 2-3, Shift management 4-5, Platform-owner page 2-3, Monthly view 1-2.
+
+Why S5 comes before IN/OUT and the lock: those rules live in the new terminal path, which only runs after the live cutover.
+
+---
+
+## NOW - S5 live cutover: waiting for your OK
+
+You decided: **same live project**, other apps removed (kept hidden, not deleted), supervisors removed. Everything is built and rehearsed on a local copy that imitates live (all checks pass, including the way back).
+
+Files: [plan](https://github.com/arwaenterprises/ak-attendance/blob/claude/cool-cannon-o7cbyn/supabase/CUTOVER_PLAN.md) | [cutover SQL](https://github.com/arwaenterprises/ak-attendance/blob/claude/cool-cannon-o7cbyn/supabase/live/live-cutover-bundle.sql) | [rollback SQL](https://github.com/arwaenterprises/ak-attendance/blob/claude/cool-cannon-o7cbyn/supabase/live/live-rollback-bundle.sql) | [rehearsal test](https://github.com/arwaenterprises/ak-attendance/blob/claude/cool-cannon-o7cbyn/tests/db/live-like.test.sql)
+
+| # | I need from you | Answer |
+|---|----------|--------|
+| 1 | Admin username for AE1 | **Answered:** `akhtaransari` (existing admin renamed) |
+| 2 | Number of punch terminals for AE1 | **Answered:** 1 main (Kaden Warehouse); Sulay to confirm |
+| 3 | A quiet window | **Answered:** 60-90 min fine; need the day/time |
+| 4 | Explicit OK on the plan | |
 
 ---
 
@@ -205,6 +230,9 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 
 | Date | Change |
 |------|--------|
+| 2026-10-02 | S5 window started. Auth accounts created by owner. App switch to the new login for all hosts prepared as version 77 (NOT merged until the database step is done); static, environment, update tests pass. |
+| 2026-10-02 | Owner approved clean-up: `supabase/live/000b_cleanup_live.sql` (delete AE2/AE3, keep punch locations Kaden Warehouse + Sulay, delete retired supervisors, expired enrolment links). In the cutover bundle; rehearsal covers it (all pass). Rollback does not undo it. |
+| 2026-10-02 | S5 artifacts built: `supabase/live/000_prepare_live.sql`, generated cutover and rollback bundles (`tools/build-live-bundle.js`, kept current by static checks), rehearsal on a live-like database (other apps archived, old rules gone, supervisors retired, rollback restores everything). Plan rewritten for in-place cutover. Waiting for owner OK. |
 | 2026-10-02 | Roadmap created from the code review. No application code changed yet. |
 | 2026-10-02 | Owner ran schema.sql and policies-temporary-open.sql on the new project successfully. Added `supabase/seed-staging.sql`. |
 | 2026-10-02 | **Finding 56 FIXED:** app-only site published by the Publish site workflow (run 1 green). Verified live: app pages 200, ROADMAP.md / supabase / tests / README 404, version still 73. |
