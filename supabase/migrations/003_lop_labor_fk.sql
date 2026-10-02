@@ -6,8 +6,13 @@
 -- 400 "Could not find a relationship" and the lists cannot load. Verified against live with a read-only request that returns no rows.
 -- Safe on a database with old data: the key is added NOT VALID (checks only new rows), then we try to validate the old rows.
 -- ============================================================
-alter table public.lop_requests
-    add constraint lop_requests_labor_id_fkey foreign key (labor_id) references public.laborers (labor_id) not valid;
+do $$
+begin
+    if not exists (select 1 from pg_constraint where conname = 'lop_requests_labor_id_fkey') then
+        alter table public.lop_requests
+            add constraint lop_requests_labor_id_fkey foreign key (labor_id) references public.laborers (labor_id) not valid;
+    end if;
+end $$;
 
 do $$
 begin

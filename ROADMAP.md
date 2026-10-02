@@ -12,12 +12,12 @@ Rule for every task: do not break the existing workflow or architecture; test be
 
 ## PROGRESS (updated after every finished task)
 
-**Overall: about 48% complete** (my estimate: the weights are judgement, not measurement)
+**Overall: about 52% complete** (my estimate: the weights are judgement, not measurement)
 
 | Area (what you asked for) | Weight | Done | Status |
 |---|---|---|---|
 | App update popup, PWA install, offline, new update icon, rename to Dawam | 15% | 100% | Live |
-| Security: database closed, new login, terminal, private photos (S1-S4 done, **S5 live cutover left**) | 30% | 80% | Built and verified on staging; live cutover is S5 |
+| Security: database closed, new login, terminal, private photos (S1-S4 done, **S5 live cutover left**) | 30% | 90% | Built and verified on staging; live cutover rehearsed locally, waiting for your OK |
 | One admin per client, Users page removed, many devices | 5% | 70% | Works on staging; goes live with S5 |
 | IN / OUT punches, 4-hour lock, repeated / mismatched punch checks | 10% | 0% | Needs S5 first (it runs in the new terminal path) |
 | Shift management: Day / Night, assign labors, reports follow the shift | 20% | 0% | Not started |
@@ -31,16 +31,18 @@ Why S5 comes before IN/OUT and the lock: those rules live in the new terminal pa
 
 ---
 
-## NOW - decisions I need from you (S5 live cutover)
+## NOW - S5 live cutover: waiting for your OK
 
-Read the plan: [supabase/CUTOVER_PLAN.md](https://github.com/arwaenterprises/ak-attendance/blob/claude/cool-cannon-o7cbyn/supabase/CUTOVER_PLAN.md). Key finding: your live Supabase project is shared with the pharmacy, expense and logigate apps, so my security migrations must NOT be run there (they would break those apps). Recommended: attendance gets its own database (the staging project, promoted).
+You decided: **same live project**, other apps removed (kept hidden, not deleted), supervisors removed. Everything is built and rehearsed on a local copy that imitates live (all checks pass, including the way back).
 
-| # | Decision | Answer |
+Files: [plan](https://github.com/arwaenterprises/ak-attendance/blob/claude/cool-cannon-o7cbyn/supabase/CUTOVER_PLAN.md) | [cutover SQL](https://github.com/arwaenterprises/ak-attendance/blob/claude/cool-cannon-o7cbyn/supabase/live/live-cutover-bundle.sql) | [rollback SQL](https://github.com/arwaenterprises/ak-attendance/blob/claude/cool-cannon-o7cbyn/supabase/live/live-rollback-bundle.sql) | [rehearsal test](https://github.com/arwaenterprises/ak-attendance/blob/claude/cool-cannon-o7cbyn/tests/db/live-like.test.sql)
+
+| # | I need from you | Answer |
 |---|----------|--------|
-| 1 | Own database for attendance (recommended)? | |
-| 2 | The 3 active supervisors in AE1: remove, or keep a supervisor login? | |
-| 3 | AE2 (1 laborer, 2 departments): migrate or leave? | |
-| 4 | Number of terminals for AE1; best time for a 30-60 minute window | |
+| 1 | Admin username for AE1 (the one login, e.g. `admin`) | |
+| 2 | Number of punch terminals for AE1 | |
+| 3 | A quiet 30-60 minute window | |
+| 4 | Explicit OK on the plan | |
 
 ---
 
@@ -228,6 +230,7 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 
 | Date | Change |
 |------|--------|
+| 2026-10-02 | S5 artifacts built: `supabase/live/000_prepare_live.sql`, generated cutover and rollback bundles (`tools/build-live-bundle.js`, kept current by static checks), rehearsal on a live-like database (other apps archived, old rules gone, supervisors retired, rollback restores everything). Plan rewritten for in-place cutover. Waiting for owner OK. |
 | 2026-10-02 | Roadmap created from the code review. No application code changed yet. |
 | 2026-10-02 | Owner ran schema.sql and policies-temporary-open.sql on the new project successfully. Added `supabase/seed-staging.sql`. |
 | 2026-10-02 | **Finding 56 FIXED:** app-only site published by the Publish site workflow (run 1 green). Verified live: app pages 200, ROADMAP.md / supabase / tests / README 404, version still 73. |
