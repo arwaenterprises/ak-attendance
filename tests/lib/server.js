@@ -1,6 +1,6 @@
 // Minimal static file server for the tests (serves the repo root on localhost, which selects the STAGING database).
 const http = require('http'), fs = require('fs'), path = require('path');
-const ROOT = path.resolve(__dirname, '..', '..');
+const ROOT = process.env.SITE_ROOT ? path.resolve(process.env.SITE_ROOT) : path.resolve(__dirname, '..', '..');   // SITE_ROOT: test the built public site instead of the repo
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.svg': 'image/svg+xml' };
 let counter = 0, down = false;   // down = true: drop every connection, like a device with no network   // /__test/counter.js returns a different number on every request (used to prove network-first)
 module.exports = function start(port = 0) {
