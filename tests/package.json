@@ -3,7 +3,9 @@
   "private": true,
   "scripts": {
     "static": "node static-checks.js",
-    "test": "node static-checks.js && node baseline.test.js && node update.test.js && node smoke.test.js"
+    "test": "node static-checks.js && node environment.test.js && node baseline.test.js && node auth.test.js && node update.test.js && node smoke.test.js"
   },
-  "devDependencies": { "playwright": "1.56.1" }
+  "devDependencies": {
+    "playwright": "1.56.1"
+  }
 }

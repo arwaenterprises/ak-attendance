@@ -26,13 +26,14 @@ const PAGES = ['/index.html', '/dashboard.html', '/admin/departments.html', '/ad
 
   for (const p of PAGES) {
     await test(`${p} opens, no script errors, no missing local files, update icon present`, async () => {
-      const errors = [], missing = [];
-      const onErr = e => errors.push(e.message); const onResp = r => { if (r.url().startsWith(url) && r.status() >= 400) missing.push(r.status() + ' ' + r.url().replace(url, '')); };
+      const errors = [], missing = [], refused = [];
+      const onErr = e => errors.push(e.message); const onResp = r => { if (r.url().startsWith(url) && r.status() >= 400) missing.push(r.status() + ' ' + r.url().replace(url, '')); else if (/supabase\.co\/(rest|storage)/.test(r.url()) && r.status() >= 400 && r.status() !== 406) refused.push(r.status() + ' ' + r.request().method() + ' ' + new URL(r.url()).pathname.replace('/rest/v1/', '') ); };
       page.on('pageerror', onErr); page.on('response', onResp);
       await page.goto(url + p); await page.waitForFunction(() => document.getElementById('dawamUpdateBtn'), null, { timeout: 15000 });
       await page.waitForTimeout(1200);
       page.off('pageerror', onErr); page.off('response', onResp);
       eq(errors, [], 'script errors'); eq(missing.filter(m => !m.includes('favicon')), [], 'missing files');
+      eq(refused, [], 'database requests refused or failing while logged in (406 = a lookup that found no row, harmless)');
       if (SHOTS && ['/dashboard.html', '/admin/settings.html'].includes(p)) await page.screenshot({ path: path.join(SHOTS, 'header' + p.replace(/[\/.]/g, '_') + '.png') });
     });
   }

@@ -29,7 +29,9 @@ jobs:
       - name: Browser tests
         working-directory: tests
         run: |
+          node environment.test.js
           node baseline.test.js
+          node auth.test.js
           node update.test.js
           node smoke.test.js
 
