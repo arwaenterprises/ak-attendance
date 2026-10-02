@@ -35,8 +35,8 @@ end;
 $$;
 revoke all on function public._punch_day(uuid, text, date, time) from public, anon, authenticated;
 
-drop function if exists public._punch_rule(uuid, text, text, timestamp);
-create or replace function public._punch_rule(p_client uuid, p_labor text, p_type text, p_ts timestamp, p_final_date date)
+-- (the rule function gets a NEW name, _punch_check, so nothing has to be dropped; the old _punch_check from 007 is simply no longer used)
+create or replace function public._punch_check(p_client uuid, p_labor text, p_type text, p_ts timestamp, p_final_date date)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare
     v_min_minutes int := 240;
@@ -77,7 +77,7 @@ begin
     return jsonb_build_object('ok', true);
 end;
 $$;
-revoke all on function public._punch_rule(uuid, text, text, timestamp, date) from public, anon, authenticated;
+revoke all on function public._punch_check(uuid, text, text, timestamp, date) from public, anon, authenticated;
 
 create or replace function public.terminal_check_punch(p_labor_id text, p_type text, p_date date, p_time time)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
@@ -92,7 +92,7 @@ begin
         raise exception 'unknown or inactive labor' using errcode = 'P0001';
     end if;
     select * into v_day from public._punch_day(v_client, p_labor_id, p_date, p_time);
-    v_rule := public._punch_rule(v_client, p_labor_id, p_type, p_date + p_time, v_day.final_date);
+    v_rule := public._punch_check(v_client, p_labor_id, p_type, p_date + p_time, v_day.final_date);
     return jsonb_build_object('allowed', (v_rule ->> 'ok')::boolean, 'code', v_rule ->> 'code', 'message', v_rule ->> 'message');
 end;
 $$;
@@ -151,7 +151,7 @@ begin
     end if;
 
     -- IN / OUT rules (repeat, mismatch, 4-hour lock): a refused punch is NOT stored; the terminal shows the message
-    v_rule := public._punch_rule(v_client, v_labor_id, v_type, v_date + v_time, v_final_date);
+    v_rule := public._punch_check(v_client, v_labor_id, v_type, v_date + v_time, v_final_date);
     if not (v_rule ->> 'ok')::boolean then
         return jsonb_build_object('success', false, 'rejected', true, 'code', v_rule ->> 'code', 'message', v_rule ->> 'message');
     end if;
@@ -172,3 +172,8 @@ grant execute on function public.terminal_record_punch(jsonb) to authenticated;
 -- Changelog
 -- 2026-10-02  009  Written and tested locally. Not applied to any Supabase project yet.
 -- ============================================================
+
+-- proof that it ran (the result panel must show this row):
+select 'migration 009 applied' as result,
+       (select count(*) from pg_proc where proname = '_punch_day') as punch_day_functions,
+       (select count(*) from pg_proc where proname = '_punch_check') as punch_check_functions;
