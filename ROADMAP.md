@@ -230,6 +230,7 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 
 | Date | Change |
 |------|--------|
+| 2026-10-02 | S5 window started. Auth accounts created by owner. App switch to the new login for all hosts prepared as version 77 (NOT merged until the database step is done); static, environment, update tests pass. |
 | 2026-10-02 | Owner approved clean-up: `supabase/live/000b_cleanup_live.sql` (delete AE2/AE3, keep punch locations Kaden Warehouse + Sulay, delete retired supervisors, expired enrolment links). In the cutover bundle; rehearsal covers it (all pass). Rollback does not undo it. |
 | 2026-10-02 | S5 artifacts built: `supabase/live/000_prepare_live.sql`, generated cutover and rollback bundles (`tools/build-live-bundle.js`, kept current by static checks), rehearsal on a live-like database (other apps archived, old rules gone, supervisors retired, rollback restores everything). Plan rewritten for in-place cutover. Waiting for owner OK. |
 | 2026-10-02 | Roadmap created from the code review. No application code changed yet. |
