@@ -10,15 +10,14 @@ Rule for every task: do not break the existing workflow or architecture; test be
 
 ---
 
-## NOW - your next steps (one at a time)
+## NOW - your next step (one at a time)
 
 | Step | What you do | Done? |
 |------|-------------|-------|
-| 15 | Staging: Auth user + `staging-security-bundle.sql` | Yes (verified: 12 login/lock-out checks, 16 baseline, 24 update tests pass on staging) |
-| 16 | **STAGING project:** SQL Editor > New query > paste the whole file `supabase/migrations/003_lop_labor_fk.sql` > Run. (Fixes the LOP lists; see finding 58.) Reply "done" | No |
-| 17 | (after 16) Authentication settings: turn OFF "Allow new users to sign up" | No |
+| 16 | Staging: migration 003 applied (verified: all 15 pages load with no failing database request, incl. the LOP lists) | Yes |
+| 17 | **STAGING project:** Supabase > Authentication > turn OFF "Allow new users to sign up" (look under "Sign In / Providers" > Email, or "Providers" in older layouts; if you cannot find it, tell me what the menu shows) and reply "done" | No |
 
-Parked, not forgotten: licence of the update icon picture (step 11).
+Parked, not forgotten: licence of the update icon picture (step 11); live LOP fix (finding 58) needs your OK.
 
 ---
 
