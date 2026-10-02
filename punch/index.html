@@ -12,9 +12,10 @@
     <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', sans-serif; background: #000; overflow: hidden; height: 100vh; }
+        html { height: 100%; overflow: hidden; overscroll-behavior: none; }
+        body { font-family: 'Segoe UI', sans-serif; background: #000; overflow: hidden; height: 100%; position: fixed; inset: 0; width: 100%; }
         
-        .punch-container { position: relative; width: 100vw; height: 100vh; display: flex; flex-direction: column; }
+        .punch-container { position: relative; width: 100%; height: var(--app-h, 100dvh); display: flex; flex-direction: column; overflow: hidden; }
         
         .top-bar {
             background: rgba(0,0,0,0.9);
@@ -174,8 +175,9 @@
         .view-attendance-link { font-size: 14px; font-weight: 700; color: #7DD3FC; margin-top: 4px; text-decoration: none; }
         .time { font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; color: #F8FAFC; }
         .date { font-size: 12px; color: #94A3B8; }
-        .camera-section { background: #0B1220; }
-        .face-guide { width: min(62vw, 260px); height: min(80vw, 340px); max-height: 52vh; border: 4px solid #4ADE80; border-radius: 50%; top: 40%; transform: translate(-50%, -50%); box-shadow: 0 0 0 9999px rgba(11,18,32,0.35), 0 0 30px rgba(74,222,128,0.35); }
+        .camera-section { background: #0B1220; min-height: 0; overflow: hidden; }
+        .top-bar { flex-shrink: 0; }
+        .face-guide { width: min(62vw, 260px); height: min(80vw, 340px); max-height: calc(100% - 210px); border: 4px solid #4ADE80; border-radius: 50%; top: calc(50% - 90px); transform: translate(-50%, -50%); box-shadow: 0 0 0 9999px rgba(11,18,32,0.35), 0 0 30px rgba(74,222,128,0.35); }
         .location-bar { top: 12px; bottom: auto; left: 12px; transform: none; background: rgba(11,18,32,0.82); color: #CBD5E1; padding: 7px 13px; border-radius: 999px; font-size: 13px; font-weight: 600; max-width: 85%; }
         .location-bar.valid { background: rgba(11,18,32,0.82); color: #4ADE80; }
         .location-bar.invalid { background: rgba(127,29,29,0.92); color: #FECACA; }
@@ -185,7 +187,7 @@
         .id-input-panel input:focus { border-color: #7DD3FC; }
         .id-error { color: #FCA5A5; margin-top: 10px; font-size: 15px; font-weight: 600; display: none; }
         .punch-actions { display: flex; gap: 10px; margin-top: 12px; }
-        .act-btn { flex: 1; height: 76px; border: 0; border-radius: 20px; font-family: inherit; font-size: 28px; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 9px; cursor: pointer; }
+        .act-btn { flex: 1; min-width: 0; padding: 0 6px; height: 76px; border: 0; border-radius: 20px; font-family: inherit; font-size: 28px; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 9px; cursor: pointer; }
         .act-btn .ar { font-size: 17px; font-weight: 700; opacity: .8; }
         .act-btn:active { transform: scale(0.97); }
         .act-btn:disabled { opacity: .45; cursor: not-allowed; }
@@ -205,6 +207,7 @@
         .status-overlay.k-error { background: #1F1226; color: #FDF2F8; } .k-error .status-icon { background: #F87171; }
         .status-overlay.k-info { background: #0B1220; color: #F8FAFC; } .k-info .status-icon { background: #38BDF8; }
         .status-overlay .status-time.success, .status-overlay .status-time.error { color: inherit; }
+        @media (max-width: 360px) { .act-btn { font-size: 24px; gap: 6px; } .act-btn .ar { display: none; } .act-btn svg { width: 24px; height: 24px; } }
         @media (max-height: 640px) { .act-btn { height: 64px; font-size: 24px; } .status-time { font-size: 56px; } .status-icon { width: 88px; height: 88px; } }
 
         .hidden { display: none !important; }
@@ -578,17 +581,31 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="../js/config/supabase.js?v=78"></script>
-    <script src="../js/utils/date-utils.js?v=78"></script>
-    <script src="../js/utils/photo-utils.js?v=78"></script>
-    <script src="../js/utils/offline-storage.js?v=78"></script>
-    <script src="../js/utils/sync-manager.js?v=78"></script>
-    <script src="../js/api/labor-api.js?v=78"></script>
-    <script src="../js/api/punch-api.js?v=78"></script>
-    <script src="../js/api/terminal-api.js?v=78"></script>
-    <script src="../js/utils/photo-url.js?v=78"></script>
+    <script src="../js/config/supabase.js?v=79"></script>
+    <script src="../js/utils/date-utils.js?v=79"></script>
+    <script src="../js/utils/photo-utils.js?v=79"></script>
+    <script src="../js/utils/offline-storage.js?v=79"></script>
+    <script src="../js/utils/sync-manager.js?v=79"></script>
+    <script src="../js/api/labor-api.js?v=79"></script>
+    <script src="../js/api/punch-api.js?v=79"></script>
+    <script src="../js/api/terminal-api.js?v=79"></script>
+    <script src="../js/utils/photo-url.js?v=79"></script>
 
     <script>
+        // ============ ONE SCREEN, NO SCROLL ============
+        // On phones 100vh includes the area behind the browser bars, which cut the IN / OUT buttons. Use the visible height instead.
+        (function fitScreen() {
+            const set = () => {
+                const h = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+                document.documentElement.style.setProperty('--app-h', Math.round(h) + 'px');
+                window.scrollTo(0, 0);
+            };
+            set();
+            window.addEventListener('resize', set);
+            window.addEventListener('orientationchange', set);
+            if (window.visualViewport) { window.visualViewport.addEventListener('resize', set); window.visualViewport.addEventListener('scroll', set); }
+        })();
+
         // ============ MULTI-CLIENT SaaS SUPPORT ============
         // Client session - populated from URL parameter
         let CLIENT_SESSION = {
@@ -1518,7 +1535,7 @@ localStorage.setItem('pwa_client_code', clientCode);
             updateLocationBar('Offline mode - Punches will sync later', true);
         });
     </script>
-    <script src="../js/ui/app-update.js?v=78"></script>
-    <script src="../js/ui/pwa-install.js?v=78"></script>
+    <script src="../js/ui/app-update.js?v=79"></script>
+    <script src="../js/ui/pwa-install.js?v=79"></script>
 </body>
 </html>

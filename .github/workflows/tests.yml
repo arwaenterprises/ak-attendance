@@ -35,6 +35,7 @@ jobs:
           node terminal.test.js
           node photos.test.js
           node punch-ui.test.js
+          node punch-layout.test.js
           node update.test.js
           node smoke.test.js
 
