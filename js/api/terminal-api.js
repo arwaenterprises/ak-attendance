@@ -120,6 +120,12 @@ const TerminalAPI = {
         return { success: true, allowed: !!data.allowed, code: data.code || null, message: data.message || null };
     },
 
+    // Month overview for the "My attendance" screen (current or previous month only; the database refuses other months)
+    async monthAttendance(laborId, monthDate) {
+        const { data, error } = await this._rpc('terminal_month_attendance', { p_labor_id: laborId, p_month: monthDate });
+        return error ? { success: false, error: this._fail(error) } : { success: true, data };
+    },
+
     async lowConfidence(laborId) {
         const { data, error } = await this._rpc('terminal_low_confidence', { p_labor_id: laborId });
         return error ? { success: false, error: this._fail(error) } : { success: true, needsReenrollment: !!(data && data.needs_reenrollment) };

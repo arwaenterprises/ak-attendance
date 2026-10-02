@@ -6,7 +6,7 @@ cd "$(dirname "$0")/../.."
 DB=dawam_rls_test
 FAILED=0
 psql -d postgres -v ON_ERROR_STOP=1 -q -c "drop database if exists $DB" -c "create database $DB" || exit 1
-for f in tests/db/stubs.sql supabase/schema.sql supabase/policies-temporary-open.sql supabase/migrations/001_security_foundation.sql tests/db/rls.test.sql supabase/migrations/002_auth_login.sql tests/db/auth.test.sql supabase/migrations/003_lop_labor_fk.sql tests/db/lop.test.sql supabase/migrations/004_terminal.sql tests/db/terminal.test.sql supabase/migrations/005_terminal_least_privilege.sql tests/db/hardening.test.sql supabase/migrations/006_private_photos.sql tests/db/photos.test.sql supabase/migrations/007_punch_rules.sql tests/db/punchrules.test.sql; do
+for f in tests/db/stubs.sql supabase/schema.sql supabase/policies-temporary-open.sql supabase/migrations/001_security_foundation.sql tests/db/rls.test.sql supabase/migrations/002_auth_login.sql tests/db/auth.test.sql supabase/migrations/003_lop_labor_fk.sql tests/db/lop.test.sql supabase/migrations/004_terminal.sql tests/db/terminal.test.sql supabase/migrations/005_terminal_least_privilege.sql tests/db/hardening.test.sql supabase/migrations/006_private_photos.sql tests/db/photos.test.sql supabase/migrations/007_punch_rules.sql tests/db/punchrules.test.sql supabase/migrations/008_terminal_month.sql tests/db/month.test.sql; do
   echo "--- $f"
   out=$(psql -d "$DB" -v ON_ERROR_STOP=1 -q -f "$f" 2>&1); code=$?
   echo "$out" | grep -E "NOTICE:  (PASS|FAIL)|ERROR" | sed -E 's/^psql:[^ ]* NOTICE:  //; s/^psql:[^ ]* //'
