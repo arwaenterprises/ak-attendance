@@ -1,6 +1,7 @@
 // Dawam Attendance - "install this app" prompt for the punch terminal.
-// Android / desktop Chrome and Edge: shows an Install button when the browser says the app can be installed.
-// iPhone / iPad (Safari has no install prompt): shows a short "Add to Home Screen" hint instead.
+// Android / desktop Chrome and Edge: when the browser says the app can be installed, a card appears in the
+// MIDDLE of the screen with an Install button (shown on every start until the app is installed).
+// iPhone / iPad (Safari has no install prompt): the same card explains "Share > Add to Home Screen".
 (function () {
     'use strict';
 
@@ -14,56 +15,66 @@
     function storageGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
     function storageSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } }
 
-    var bar = null;
-    function ensureBar() {
-        if (bar) return bar;
+    var overlay = null;
+    function ensureOverlay() {
+        if (overlay) return overlay;
         var style = document.createElement('style');
         style.textContent =
-            '.dawam-install{position:fixed;left:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:9000;display:none;align-items:center;gap:10px;' +
-            'background:#2d3748;color:#fff;padding:10px 14px;border-radius:999px;box-shadow:0 6px 20px rgba(0,0,0,.35);font:14px/1.3 sans-serif;max-width:calc(100vw - 84px)}' +
+            '.dawam-install{position:fixed;inset:0;z-index:99990;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:16px}' +
             '.dawam-install.show{display:flex}' +
-            '.dawam-install button{border:0;border-radius:999px;padding:7px 14px;font-size:14px;cursor:pointer}' +
-            '.dawam-install .go{background:#667eea;color:#fff}' +
-            '.dawam-install .no{background:transparent;color:#cbd5e0;padding:7px 8px}';
+            '.dawam-install-box{background:#fff;color:#2d3748;border-radius:16px;max-width:340px;width:100%;padding:24px 20px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.4);font:15px/1.4 sans-serif}' +
+            '.dawam-install-box img{width:72px;height:72px;border-radius:16px;display:block;margin:0 auto 10px}' +
+            '.dawam-install-box h3{margin:0 0 8px;font-size:19px}' +
+            '.dawam-install-box p{margin:0 0 6px}' +
+            '.dawam-install-actions{display:flex;gap:10px;justify-content:center;margin-top:16px}' +
+            '.dawam-install-actions button{min-width:110px;padding:11px 14px;border-radius:8px;border:1px solid #cbd5e0;background:#edf2f7;color:#2d3748;font-size:15px;cursor:pointer}' +
+            '.dawam-install-actions button.go{background:#667eea;border-color:#667eea;color:#fff}';
         document.head.appendChild(style);
-        bar = document.createElement('div');
-        bar.className = 'dawam-install'; bar.id = 'dawamInstallBar';
-        document.body.appendChild(bar);
-        return bar;
+        overlay = document.createElement('div');
+        overlay.className = 'dawam-install'; overlay.id = 'dawamInstallBar';
+        overlay.setAttribute('role', 'dialog'); overlay.setAttribute('aria-modal', 'true');
+        document.body.appendChild(overlay);
+        return overlay;
     }
-    function hide() { if (bar) bar.classList.remove('show'); }
+    function hide() { if (overlay) overlay.classList.remove('show'); }
 
-    function showInstallButton() {
+    function card(body, buttons) {
+        var o = ensureOverlay();
+        o.innerHTML = '<div class="dawam-install-box"><img src="/icons/icon-192.png" alt="">' +
+            '<h3>Install Dawam Attendance</h3>' + body + '<div class="dawam-install-actions">' + buttons + '</div></div>';
+        o.classList.add('show');
+        return o;
+    }
+
+    function showInstallCard() {
         if (isStandalone()) return;
-        var b = ensureBar();
-        b.innerHTML = '<span>Install Dawam Attendance on this device</span><button type="button" class="go" id="dawamInstallGo">Install</button><button type="button" class="no" id="dawamInstallNo" aria-label="Dismiss">✕</button>';
-        b.classList.add('show');
-        b.querySelector('#dawamInstallGo').addEventListener('click', function () {
+        var o = card('<p>Install the app on this device for faster start and offline use.</p>',
+            '<button type="button" class="go" id="dawamInstallGo">Install</button><button type="button" id="dawamInstallNo">Not now</button>');
+        o.querySelector('#dawamInstallGo').addEventListener('click', function () {
             if (!deferredPrompt) return;
             var p = deferredPrompt; deferredPrompt = null;
             hide();
             p.prompt();
             if (p.userChoice && p.userChoice.then) p.userChoice.then(function () { /* accepted or dismissed: nothing more to do */ });
         });
-        b.querySelector('#dawamInstallNo').addEventListener('click', hide);
+        o.querySelector('#dawamInstallNo').addEventListener('click', hide);
     }
 
-    function showIosHint() {
+    function showIosCard() {
         if (isStandalone() || storageGet(HINT_KEY)) return;
-        var b = ensureBar();
-        b.innerHTML = '<span>To install: tap <strong>Share</strong>, then <strong>Add to Home Screen</strong></span><button type="button" class="no" id="dawamInstallNo" aria-label="Dismiss">✕</button>';
-        b.classList.add('show');
-        b.querySelector('#dawamInstallNo').addEventListener('click', function () { storageSet(HINT_KEY, '1'); hide(); });
+        var o = card('<p>Tap <strong>Share</strong>, then <strong>Add to Home Screen</strong>.</p>',
+            '<button type="button" class="go" id="dawamInstallNo">Got it</button>');
+        o.querySelector('#dawamInstallNo').addEventListener('click', function () { storageSet(HINT_KEY, '1'); hide(); });
     }
 
     window.addEventListener('beforeinstallprompt', function (e) {
-        e.preventDefault();                  // keep the browser's own mini-bar away; we show our button instead
+        e.preventDefault();                  // keep the browser's own mini-bar away; we show our card instead
         deferredPrompt = e;
-        showInstallButton();
+        showInstallCard();
     });
     window.addEventListener('appinstalled', function () { deferredPrompt = null; hide(); });
 
     if (isIos()) {
-        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', showIosHint); else showIosHint();
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', showIosCard); else showIosCard();
     }
 })();

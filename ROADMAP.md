@@ -14,8 +14,9 @@ Rule for every task: do not break the existing workflow or architecture; test be
 
 | Step | What you do | Done? |
 |------|-------------|-------|
-| 7 | If the Super Admin password `AK@2026` (user `akhtar`) is, or ever was, used on the LIVE app: change it. Tell me if this repository is public | No |
-| 8 | Decide: may I merge this work into the live site now (the update mechanism needs to be live before it can update anyone), or do you want to test it on a real phone first? | No |
+| 9 | Answer one question: may I set up publishing so only the app files are public (finding 56)? It needs ONE setting change by you in GitHub (Settings > Pages > Source > "GitHub Actions") | No |
+| 10 | Say "live" and I merge the new update icon + centred install card (version 73) to the live site | No |
+| 11 | Check you have the right to use the update icon picture (it looks like a stock icon; free icon sites usually require credit). I do not have a verified source for its licence | No |
 
 Everything else is mine until I ask.
 
@@ -63,7 +64,7 @@ Everything else is mine until I ask.
 | 8 | Install prompt on the punch terminal (`js/ui/pwa-install.js`): Install button when the browser offers it, Add-to-Home-Screen hint on iPhone. Tested with a simulated browser event. **Not tested on a real phone** | Medium | Done (verify on real devices) |
 | 9 | Real PNG app icons: 192, 512 and maskable 512 in `/icons` and the manifest (name "Dawam Attendance"). **Placeholder** design (white D on purple); replace with your logo when you have one. Verify installing on a real phone | Medium | Done (placeholder icon; logo needed) |
 | 10 | Fix offline-sync registration code in `js/utils/sync-manager.js` (~line 413 uses `window.registration` / `navigator.serviceWorker.sync`, which I believe are not valid; verify in current docs) and the `online` listener inside `sw.js` (a service worker likely never receives it) | Medium | Todo |
-| 11 | GitHub Pages cannot set `no-cache` headers (it serves files with a short cache, I believe about 10 minutes; verify). Updates may appear up to that long after deploy. Test on a real device | Low | Todo |
+| 11 | GitHub Pages cannot set `no-cache` headers. **Confirmed on the live site: `sw.js` is served with `cache-control: max-age=600`** (10 minutes). The in-app check bypasses the cache, and the service worker revalidates files, so the impact should be small; still test on a real device | Low | Todo (real-device test) |
 
 ### 3. Rename and single admin
 
@@ -155,6 +156,8 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 
 | 55 | **README published a default Super Admin login** (username `akhtar`, a password). Removed from the README, but it stays in the repository history. If that password is still used anywhere, change it now. Also check whether this repository is public | High | Needs your action |
 
+| 56 | **GitHub Pages publishes the whole repository on your live domain.** Confirmed reachable today: `/ROADMAP.md` (this file, with the security findings), `/supabase/schema.sql`, `/supabase/seed-staging.sql` (staging test login in a comment), `/tests/harness.html`. Anyone can read the database structure and the list of weaknesses. The anon key is public anyway, but a roadmap of open holes should not be. Fix: publish only the app files with a small GitHub Actions workflow (and switch Settings > Pages > Source to "GitHub Actions"). Until then, treat everything in this repository as public. Also answers the earlier question whether the repo is public: Pages exposure is the same either way | High | Needs your answer (step 9) |
+
 ---
 
 ## D. Feedback and suggestions
@@ -183,6 +186,8 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 |------|--------|
 | 2026-10-02 | Roadmap created from the code review. No application code changed yet. |
 | 2026-10-02 | Owner ran schema.sql and policies-temporary-open.sql on the new project successfully. Added `supabase/seed-staging.sql`. |
+| 2026-10-02 | Owner's own update icon (`icons/ui-update.png`) now used everywhere; on the punch terminal it sits next to "View My Attendance". Install prompt is now a centred card shown at start (Install / Not now; iPhone shows Add to Home Screen steps). Version 73. 24 update tests + 15 smoke tests pass. Not yet merged to live. |
+| 2026-10-02 | **Merged to main and LIVE (PR 9, version 72).** Verified on the live domain: sw.js v72, new login page, manifest, icons, punch page respond. Live host uses the live database (host test). Found: the whole repo is publicly served (finding 56). |
 | 2026-10-02 | Rename to Dawam Attendance (task 12), version 72, static check against leftover AK names; README default login removed (finding 55). All suites pass: static, 16 baseline, 22 update, 15 smoke. |
 | 2026-10-02 | Update mechanism built: new service worker, `app-update.js`, `pwa-install.js`, icons, manifest, `tools/bump-version.js`, static checks, 22 update tests, 15 page smoke tests. Everything passes locally: static checks, 16 baseline, 22 update, 15 smoke. Version now 71. |
 | 2026-10-02 | Baseline tests written (16 pass on staging). They found 2 new bugs: findings 52, 53. CI workflow added, not yet run on GitHub. |

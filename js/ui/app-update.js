@@ -117,8 +117,10 @@
 
     // ---------- DOM ----------
     var CSS = '' +
-        '.dawam-upd-btn{position:relative;width:34px;height:34px;padding:5px;border-radius:50%;border:1px solid rgba(120,120,120,.45);background:rgba(255,255,255,.92);color:#4a5568;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;vertical-align:middle}' +
-        '.dawam-upd-btn svg{width:20px;height:20px;display:block}' +
+        '.dawam-upd-btn{position:relative;width:34px;height:34px;padding:0;border:0;background:transparent;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;vertical-align:middle}' +
+        '.dawam-upd-btn img{width:30px;height:30px;display:block;pointer-events:none}' +
+        '.dawam-upd-row{display:flex;align-items:center;gap:8px;margin-top:4px}' +
+        '.dawam-upd-row .view-attendance-link{margin-top:0}' +
         '.dawam-upd-btn.floating{position:fixed;top:8px;right:8px;z-index:9000}' +
         '.dawam-upd-btn.floating-br{position:fixed;bottom:calc(14px + env(safe-area-inset-bottom,0px));right:14px;z-index:9000}' +
         '.dawam-upd-dot{position:absolute;top:0;right:0;width:11px;height:11px;border-radius:50%;background:#ff3b30;border:2px solid #fff}' +
@@ -133,8 +135,7 @@
         '.dawam-upd-actions button{min-width:110px;padding:10px 14px;border-radius:8px;border:1px solid #cbd5e0;background:#edf2f7;color:#2d3748;font-size:15px;cursor:pointer}' +
         '.dawam-upd-actions button.primary{background:#667eea;border-color:#667eea;color:#fff}';
 
-    var ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-        '<path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></svg>';
+    var ICON = '<img src="/icons/ui-update.png" alt="" width="30" height="30">';
 
     function build() {
         var style = document.createElement('style');
@@ -146,9 +147,17 @@
         btn.title = 'App updates'; btn.setAttribute('aria-label', 'App updates');
         btn.innerHTML = ICON + '<span class="dawam-upd-dot" id="dawamUpdateDot" hidden></span>';
         var host = document.querySelector('.header-actions');
+        var viewLink = document.querySelector('.view-attendance-link');
         if (host) { host.insertBefore(btn, host.firstChild); }
-        else {
-            // Punch terminal: the top-right holds the clock, so the icon sits bottom-right. Other pages without a header: top-right.
+        else if (viewLink) {
+            // Punch terminal: the icon sits right next to "View My Attendance" (same row).
+            var row = document.createElement('div');
+            row.className = 'dawam-upd-row';
+            viewLink.parentNode.insertBefore(row, viewLink);
+            row.appendChild(viewLink);
+            row.appendChild(btn);
+        } else {
+            // Pages without a header: top-right (or bottom-right where the top-right holds a clock).
             btn.className += document.querySelector('.top-bar') ? ' floating-br' : ' floating';
             document.body.appendChild(btn);
         }
@@ -157,7 +166,7 @@
         overlay.className = 'dawam-upd-overlay'; overlay.id = 'dawamUpdateModal';
         overlay.setAttribute('role', 'dialog'); overlay.setAttribute('aria-modal', 'true'); overlay.setAttribute('aria-labelledby', 'dawamUpdateTitle');
         overlay.innerHTML =
-            '<div class="dawam-upd-box">' + ICON.replace('<svg ', '<svg style="width:48px;height:48px;color:#667eea" ') +
+            '<div class="dawam-upd-box"><img src="/icons/ui-update.png" alt="" width="64" height="64" style="display:block;margin:0 auto">' +
             '<h3 id="dawamUpdateTitle">App update</h3>' +
             '<p id="dawamUpdateText"></p>' +
             '<p class="dawam-upd-ver">Running version <strong id="dawamUpdateVer">v?</strong></p>' +
