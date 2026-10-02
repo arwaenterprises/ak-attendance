@@ -146,12 +146,12 @@ const rid = () => Math.random().toString(36).slice(2, 8).toUpperCase();
     const r = await recalc(L, '2020-03-09');
     eq([r.first_login, r.last_logout, Number(r.total_hours), r.auto_status], ['09:00:00', '18:30:00', 9.5, 'P']);
   });
-  await test('night shift 21:00-05:00 is stored as 16 hours (should be 8)', async () => {
+  await test('night shift 21:00-05:00 is stored as 8 hours (first login 21:00, last logout 05:00) - finding 48 fixed by migration 010', async () => {
     const L = await mkLabor(); created.labors.push(L);
     await punch(L, '2020-03-10', '21:00:00', 'login'); await punch(L, '2020-03-11', '05:00:00', 'logout');
     const r = await recalc(L, '2020-03-10');
-    eq([r.first_login, r.last_logout, Number(r.total_hours)], ['05:00:00', '21:00:00', 16], 'current (wrong) values');
-  }, { knownIssue: 'roadmap finding 48 - night shift hours wrong in daily_attendance' });
+    eq([r.first_login, r.last_logout, Number(r.total_hours)], ['21:00:00', '05:00:00', 8]);
+  });
 
   console.log('\nOffline storage and sync');
   await test('offline punch is saved on the device, then uploaded; night-end date is corrected; no duplicate on second sync', async () => {
