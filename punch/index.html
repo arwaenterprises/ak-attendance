@@ -210,6 +210,44 @@
         @media (max-width: 360px) { .act-btn { font-size: 24px; gap: 6px; } .act-btn .ar { display: none; } .act-btn svg { width: 24px; height: 24px; } }
         @media (max-height: 640px) { .act-btn { height: 64px; font-size: 24px; } .status-time { font-size: 56px; } .status-icon { width: 88px; height: 88px; } }
 
+
+        /* ===== My attendance (month view) ===== */
+        .attendance-modal { background: #0B1220; color: #F8FAFC; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .attendance-header { background: #0B1220; border-bottom: 1px solid #1E293B; padding: 12px 16px; }
+        .attendance-info { background: transparent; border: 0; padding: 0; }
+        .attendance-info .name { font-size: 18px; font-weight: 800; color: #F8FAFC; }
+        .attendance-info .sub { font-size: 13px; color: #94A3B8; margin-top: 2px; }
+        .attendance-close { background: #273449; color: #F8FAFC; width: auto; height: 44px; border-radius: 12px; padding: 0 20px; font-size: 16px; font-weight: 700; }
+        .month-nav { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 6px; }
+        .month-title { font-size: 22px; font-weight: 800; }
+        .month-buttons { display: flex; gap: 8px; }
+        .month-buttons button { width: 44px; height: 44px; border: 0; border-radius: 12px; background: #273449; color: #F8FAFC; font-size: 24px; font-weight: 800; cursor: pointer; }
+        .month-buttons button:disabled { color: #475569; cursor: not-allowed; }
+        .cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; padding: 6px 16px; }
+        .cal .h { font-size: 11px; font-weight: 700; color: #94A3B8; text-align: center; }
+        .cal-day { height: 44px; border: 0; border-radius: 10px; background: #111C30; color: #94A3B8; font-family: inherit; font-size: 15px; font-weight: 800; line-height: 1.05; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+        .cal-day small { font-size: 10px; font-weight: 700; }
+        .cal-day.p { background: #14532D; color: #BBF7D0; } .cal-day.h { background: #713F12; color: #FDE68A; }
+        .cal-day.a { background: #7F1D1D; color: #FECACA; } .cal-day.o { background: #1E293B; color: #CBD5E1; }
+        .cal-day.today { box-shadow: 0 0 0 3px #38BDF8; } .cal-day.sel { outline: 2px solid #F8FAFC; outline-offset: 1px; }
+        .cal-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 4px 16px 8px; font-size: 12px; color: #94A3B8; }
+        .cal-legend b { font-weight: 800; } .lg-p { color: #BBF7D0; } .lg-h { color: #FDE68A; } .lg-a { color: #FECACA; } .lg-o { color: #CBD5E1; }
+        .month-totals { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 4px 16px 10px; }
+        .month-totals div { background: #111C30; border-radius: 14px; padding: 10px 4px; text-align: center; }
+        .month-totals .n { font-size: 24px; font-weight: 800; } .month-totals .l { font-size: 11px; color: #94A3B8; }
+        .day-detail { padding: 0 16px 24px; }
+        .day-title { font-size: 12px; font-weight: 700; color: #94A3B8; text-transform: uppercase; margin: 6px 0 8px; }
+        .attendance-list { padding: 0; }
+        .punch-item { background: #111C30; border: 1px solid #1E293B; border-radius: 14px; padding: 12px 14px; margin-bottom: 8px; gap: 12px; }
+        .punch-type { width: 56px; height: 44px; border-radius: 12px; font-size: 16px; font-weight: 800; }
+        .punch-type.login { background: #14532D; color: #BBF7D0; } .punch-type.logout { background: #78350F; color: #FDE68A; }
+        .punch-details .type-label { display: none; }
+        .punch-details .time { font-size: 22px; font-weight: 800; margin: 0; font-variant-numeric: tabular-nums; }
+        .punch-details .location { font-size: 13px; color: #94A3B8; }
+        .attendance-summary { background: transparent; padding: 4px 0; margin: 0; text-align: left; }
+        .summary-hours { font-size: 14px; font-weight: 700; color: #94A3B8; }
+        .no-punches { color: #94A3B8; text-align: center; padding: 18px 10px; font-size: 15px; }
+
         .hidden { display: none !important; }
         
         .no-internet {
@@ -555,18 +593,23 @@
         <!-- Attendance Modal -->
         <div class="attendance-modal" id="attendanceModal">
             <div class="attendance-header">
-                <h2>📊 My Attendance Today</h2>
-                <button class="attendance-close" onclick="closeAttendanceModal()">✕</button>
+                <div class="attendance-info" id="attendanceInfo"></div>
+                <button class="attendance-close" onclick="closeAttendanceModal()" aria-label="Close">Close</button>
             </div>
-            <div class="attendance-info" id="attendanceInfo">
-                <div class="name">Loading...</div>
-                <div class="date"></div>
+            <div class="month-nav">
+                <div class="month-title" id="monthTitle"></div>
+                <div class="month-buttons">
+                    <button type="button" id="monthPrev" aria-label="Previous month" onclick="changeMonth(-1)">&lsaquo;</button>
+                    <button type="button" id="monthNext" aria-label="Next month" onclick="changeMonth(1)">&rsaquo;</button>
+                </div>
             </div>
-            <div class="attendance-list" id="attendanceList">
-                <!-- Punch items will be loaded here -->
-            </div>
-            <div class="attendance-summary" id="attendanceSummary">
-                <!-- Summary will be loaded here -->
+            <div class="cal" id="calGrid"></div>
+            <div class="cal-legend"><span><b class="lg-p">P</b> Present</span><span><b class="lg-h">H</b> Half day</span><span><b class="lg-a">A</b> Absent</span><span><b class="lg-o">O</b> Holiday</span></div>
+            <div class="month-totals" id="monthTotals"></div>
+            <div class="day-detail">
+                <div class="day-title" id="dayTitle"></div>
+                <div class="attendance-list" id="attendanceList"></div>
+                <div class="attendance-summary" id="attendanceSummary"></div>
             </div>
         </div>
 
@@ -581,15 +624,15 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="../js/config/supabase.js?v=81"></script>
-    <script src="../js/utils/date-utils.js?v=81"></script>
-    <script src="../js/utils/photo-utils.js?v=81"></script>
-    <script src="../js/utils/offline-storage.js?v=81"></script>
-    <script src="../js/utils/sync-manager.js?v=81"></script>
-    <script src="../js/api/labor-api.js?v=81"></script>
-    <script src="../js/api/punch-api.js?v=81"></script>
-    <script src="../js/api/terminal-api.js?v=81"></script>
-    <script src="../js/utils/photo-url.js?v=81"></script>
+    <script src="../js/config/supabase.js?v=82"></script>
+    <script src="../js/utils/date-utils.js?v=82"></script>
+    <script src="../js/utils/photo-utils.js?v=82"></script>
+    <script src="../js/utils/offline-storage.js?v=82"></script>
+    <script src="../js/utils/sync-manager.js?v=82"></script>
+    <script src="../js/api/labor-api.js?v=82"></script>
+    <script src="../js/api/punch-api.js?v=82"></script>
+    <script src="../js/api/terminal-api.js?v=82"></script>
+    <script src="../js/utils/photo-url.js?v=82"></script>
 
     <script>
         // ============ ONE SCREEN, NO SCROLL ============
@@ -1394,7 +1437,101 @@ localStorage.setItem('pwa_client_code', clientCode);
         }
 
         // Show attendance modal - WITH CLIENT FILTER
+        // ============ MY ATTENDANCE: month view (current + previous month) ============
+        let viewLabor = null, viewOffset = 0, viewSelected = null, monthIdleTimer = null;
+        const esc = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const ymd = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        function bumpIdle() {                      // a shared terminal: close the labor's page after a minute without a touch
+            clearTimeout(monthIdleTimer);
+            monthIdleTimer = setTimeout(() => closeAttendanceModal(), 60000);
+        }
+
+        async function showMonthAttendance(labor) {
+            isViewingAttendance = false;
+            document.getElementById('verifyingOverlay').classList.remove('active');
+            viewLabor = labor; viewOffset = 0; viewSelected = DateUtils.today();
+            document.getElementById('attendanceInfo').innerHTML = `<div class="name">${esc(labor.name)}</div><div class="sub">${esc(labor.labor_id)}</div>`;
+            document.getElementById('attendanceModal').classList.add('active');
+            document.getElementById('attendanceModal').scrollTop = 0;
+            bumpIdle();
+            await loadMonth();
+        }
+
+        function changeMonth(delta) {
+            const next = viewOffset + delta;
+            if (next > 0 || next < -1) return;      // only the current and the previous month
+            viewOffset = next; viewSelected = null; bumpIdle();
+            loadMonth();
+        }
+
+        async function loadMonth() {
+            const t = new Date(), start = new Date(t.getFullYear(), t.getMonth() + viewOffset, 1);
+            const days = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
+            document.getElementById('monthTitle').textContent = start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            document.getElementById('monthPrev').disabled = viewOffset <= -1;
+            document.getElementById('monthNext').disabled = viewOffset >= 0;
+            const grid = document.getElementById('calGrid');
+            grid.innerHTML = '<div class="no-punches" style="grid-column:1/-1">Loading...</div>';
+            const r = await TerminalAPI.monthAttendance(viewLabor.labor_id, ymd(start));
+            if (!r.success) { grid.innerHTML = `<div class="no-punches" style="grid-column:1/-1">Could not load. ${esc(r.error)}</div>`; return; }
+            const d = r.data, byDate = {}, hol = {};
+            (d.days || []).forEach(x => { byDate[x.date] = x; });
+            (d.holidays || []).forEach(x => { hol[x.date] = x.name; });
+            const todayStr = DateUtils.today();
+            let html = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(n => `<div class="h">${n}</div>`).join('');
+            for (let i = 0; i < start.getDay(); i++) html += '<div></div>';
+            for (let n = 1; n <= days; n++) {
+                const ds = ymd(new Date(start.getFullYear(), start.getMonth(), n)), e = byDate[ds];
+                let cls = '', letter = '';
+                if (e && e.status === 'P') { cls = 'p'; letter = 'P'; }
+                else if (e && e.status === 'H') { cls = 'h'; letter = 'H'; }
+                else if (e && e.status === 'A') { cls = 'a'; letter = 'A'; }
+                else if (hol[ds]) { cls = 'o'; letter = 'O'; }
+                if (ds === todayStr) cls += ' today';
+                const label = ds + (letter ? ' ' + ({ P: 'Present', H: 'Half day', A: 'Absent', O: 'Holiday' }[letter]) : '');
+                html += `<button type="button" class="cal-day ${cls}" data-date="${ds}" aria-label="${label}" onclick="selectDay('${ds}')">${n}${letter ? `<small>${letter}</small>` : ''}</button>`;
+            }
+            grid.innerHTML = html;
+            document.getElementById('monthTotals').innerHTML =
+                `<div><div class="n" style="color:#BBF7D0">${d.present || 0}</div><div class="l">Present</div></div>` +
+                `<div><div class="n" style="color:#FDE68A">${d.half || 0}</div><div class="l">Half day</div></div>` +
+                `<div><div class="n" style="color:#FECACA">${d.absent || 0}</div><div class="l">Absent</div></div>` +
+                `<div><div class="n" style="color:#7DD3FC">${Math.round((Number(d.hours) || 0) * 10) / 10}h</div><div class="l">Hours</div></div>`;
+            let pick = viewSelected;
+            if (!pick) {                           // previous month: the last day that has attendance
+                const last = (d.days || []).length ? d.days[d.days.length - 1].date : null;
+                pick = viewOffset === 0 ? todayStr : last;
+            }
+            if (pick) await selectDay(pick); else { document.getElementById('dayTitle').textContent = ''; document.getElementById('attendanceList').innerHTML = '<div class="no-punches">No attendance this month</div>'; document.getElementById('attendanceSummary').innerHTML = ''; }
+        }
+
+        async function selectDay(ds) {
+            bumpIdle();
+            viewSelected = ds;
+            document.querySelectorAll('#calGrid .cal-day').forEach(b => b.classList.toggle('sel', b.dataset.date === ds));
+            const [y, m, dd] = ds.split('-').map(Number);
+            document.getElementById('dayTitle').textContent = new Date(y, m - 1, dd).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' });
+            const listEl = document.getElementById('attendanceList'), summaryEl = document.getElementById('attendanceSummary');
+            listEl.innerHTML = '<div class="no-punches">Loading...</div>'; summaryEl.innerHTML = '';
+            const { data: punches, error } = await TerminalAPI.todayPunches(viewLabor.labor_id, ds);
+            if (viewSelected !== ds) return;       // another day was tapped meanwhile
+            if (error) { listEl.innerHTML = '<div class="no-punches">Could not load this day</div>'; return; }
+            if (!punches || punches.length === 0) { listEl.innerHTML = '<div class="no-punches">No punches this day</div>'; return; }
+            listEl.innerHTML = punches.map(p => {
+                const isIn = p.type === 'login';
+                return `<div class="punch-item">
+                    <div class="punch-type ${isIn ? 'login' : 'logout'}">${isIn ? 'IN' : 'OUT'}</div>
+                    <div class="punch-details"><div class="time">${esc(formatTime(p.time))}</div><div class="location">${esc(p.location_name || '')}</div></div>
+                    ${p.photo_url ? `<img class="punch-photo" src="${PhotoURL.src(p.photo_url)}" data-photo="${esc(p.photo_url)}" onclick="openFullscreenPhoto(this.dataset.photo)" alt="Punch photo">` : ''}
+                </div>`;
+            }).join('');
+            PhotoURL.hydrate(listEl);
+            const { totalHours, stillIn } = calculateAttendance(punches);
+            summaryEl.innerHTML = `<div class="summary-hours">${esc(totalHours)} worked</div>${stillIn && ds === DateUtils.today() ? '<div class="summary-warning">Still punched IN</div>' : ''}`;
+        }
+
         async function showAttendance(labor) {
+            if (DAWAM_AUTH_MODE === 'supabase') return showMonthAttendance(labor);
             isViewingAttendance = false;
             document.getElementById('verifyingOverlay').classList.remove('active');
 
@@ -1514,7 +1651,10 @@ localStorage.setItem('pwa_client_code', clientCode);
         }
 
         function closeAttendanceModal() {
+            clearTimeout(monthIdleTimer);
             document.getElementById('attendanceModal').classList.remove('active');
+            viewLabor = null;
+            cancelViewAttendance();                 // bring the punch screen (ID box, IN / OUT, camera) back
         }
 
         async function openFullscreenPhoto(url) {
@@ -1550,7 +1690,7 @@ localStorage.setItem('pwa_client_code', clientCode);
             updateLocationBar('Offline mode - Punches will sync later', true);
         });
     </script>
-    <script src="../js/ui/app-update.js?v=81"></script>
-    <script src="../js/ui/pwa-install.js?v=81"></script>
+    <script src="../js/ui/app-update.js?v=82"></script>
+    <script src="../js/ui/pwa-install.js?v=82"></script>
 </body>
 </html>
