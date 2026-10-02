@@ -11,9 +11,9 @@ insert into public.punch_locations (id, name, department_id, latitude, longitude
   ('00000000-0000-0000-0000-00000000f004','Home','00000000-0000-0000-0000-00000000d001',1,1,'00000000-0000-0000-0000-0000000000a1');
 insert into public.punch_records (labor_id, department_id, date, time, type, location_id, client_id) values ('L1','00000000-0000-0000-0000-00000000d001', current_date, '08:00', 'IN', '00000000-0000-0000-0000-00000000f004', '00000000-0000-0000-0000-0000000000a1');
 insert into public.users (client_id, username, password_hash, name, role, status) values ('00000000-0000-0000-0000-0000000000a2','hadir@x.com','x','Hadir','admin','active');
-create table public.medicines (id serial primary key, name text);
+create table public.medicines (id serial primary key, name text, client_id uuid references public.clients(id));
 create table public.exp_expenses (id serial primary key, amount numeric);
-insert into public.medicines (name) values ('x'), ('y');
+insert into public.medicines (name, client_id) values ('x','00000000-0000-0000-0000-0000000000a3'), ('y','00000000-0000-0000-0000-0000000000a2');
 insert into public.exp_expenses (amount) values (10);
 grant all on public.medicines, public.exp_expenses to anon, authenticated;
 alter table public.medicines enable row level security;

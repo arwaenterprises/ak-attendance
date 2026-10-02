@@ -74,6 +74,13 @@ declare
     t text;
     n int;
 begin
+    -- the archived other-app tables point at company rows (e.g. medicines.client_id). Cut those links so the company rows can go; the archived rows themselves are kept.
+    for t in select format('%I.%I|%I', n.nspname, c.relname, k.conname) from pg_constraint k
+              join pg_class c on c.oid = k.conrelid join pg_namespace n on n.oid = c.relnamespace
+              where k.contype = 'f' and k.confrelid = 'public.clients'::regclass and n.nspname = 'archive_other_apps' loop
+        execute format('alter table %s drop constraint %s', split_part(t, '|', 1), split_part(t, '|', 2));
+    end loop;
+
     -- safety: only the tiny companies the owner named, and only if they are still that small
     select array_agg(id) into v_ids from public.clients where upper(client_code) in ('AE2', 'AE3');
     if v_ids is not null then
