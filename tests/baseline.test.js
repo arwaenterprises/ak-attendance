@@ -55,22 +55,23 @@ const rid = () => Math.random().toString(36).slice(2, 8).toUpperCase();
   console.log('Login');
   await test('admin login succeeds with correct company code, username, password', async () => {
     const r = await page.evaluate(() => AUTH.login('TEST', 'admin', 'Test@1234'));
-    ok(r.success, JSON.stringify(r)); eq(r.user.role, 'admin', 'role');
+    if (!r.success) throw new Error('login failed: ' + JSON.stringify(r) + '  -> is staging set up? (owner step: run supabase/staging-security-bundle.sql, create the Auth user)');
+    eq(r.user.role, 'admin', 'role'); eq(r.user.clientCode, 'TEST', 'company');
   });
-  await test('wrong password is rejected', async () => {
+  await test('wrong password is rejected with one general message (no hint which part was wrong)', async () => {
     const r = await page.evaluate(() => AUTH.login('TEST', 'admin', 'wrong'));
-    eq(r.success, false, 'success'); eq(r.error, 'Invalid password', 'error');
+    eq(r.success, false, 'success'); eq(r.error, 'Invalid company code, username or password', 'error');
   });
-  await test('wrong company code is rejected', async () => {
+  await test('wrong company code is rejected with the same general message', async () => {
     const r = await page.evaluate(() => AUTH.login('NOPE', 'admin', 'Test@1234'));
-    eq(r.success, false, 'success'); eq(r.error, 'Invalid client code', 'error');
+    eq(r.success, false, 'success'); eq(r.error, 'Invalid company code, username or password', 'error');
   });
   await test('same admin can be logged in on two devices at once', async () => {
     const a = await newPage(), b = await newPage();
     const ra = await a.page.evaluate(() => AUTH.login('TEST', 'admin', 'Test@1234'));
     const rb = await b.page.evaluate(() => AUTH.login('TEST', 'admin', 'Test@1234'));
     ok(ra.success && rb.success, 'both logins should succeed');
-    const stillA = await a.page.evaluate(() => !!localStorage.getItem('ak_attendance_session'));
+    const stillA = await a.page.evaluate(async () => !!localStorage.getItem('ak_attendance_session') && !!(await supabaseClient.auth.getSession()).data.session);
     ok(stillA, 'first device session must survive second login');
     await a.ctx.close(); await b.ctx.close();
   });

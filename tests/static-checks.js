@@ -81,6 +81,16 @@ for (const f of textFiles) fs.readFileSync(f, 'utf8').split(/\r?\n/).forEach((li
 });
 check('no leftover "AK" / "Al Abdul Karim" / "HADIR" names in app files', akHits.length === 0, akHits.slice(0, 6).join('\n        '));
 
+// new login: the email domain must be the same in the app and in the database migration; the staging bundle must be current
+const supaJs = fs.readFileSync(path.join(ROOT, 'js/config/supabase.js'), 'utf8');
+const mig002 = fs.readFileSync(path.join(ROOT, 'supabase/migrations/002_auth_login.sql'), 'utf8');
+const domainJs = (supaJs.match(/DAWAM_LOGIN_EMAIL_DOMAIN\s*=\s*'([^']+)'/) || [])[1];
+check('login email domain is the same in js/config/supabase.js and migration 002', !!domainJs && mig002.includes('.' + domainJs), String(domainJs));
+const bundleFile = path.join(ROOT, 'supabase/staging-security-bundle.sql');
+check('supabase/staging-security-bundle.sql is up to date (run: node tools/build-staging-bundle.js)',
+  fs.existsSync(bundleFile) && fs.readFileSync(bundleFile, 'utf8') === require('../tools/build-staging-bundle.js').bundle());
+check('live site keeps the old login until the cutover (DAWAM_AUTH_MODE is staging-only)', /DAWAM_AUTH_MODE\s*=\s*DAWAM_IS_STAGING\s*\?\s*'supabase'\s*:\s*'legacy'/.test(supaJs));
+
 // version must be bumped when app files changed (CI sets BASE_SHA)
 const base = process.env.BASE_SHA;
 if (base && !/^0+$/.test(base)) {

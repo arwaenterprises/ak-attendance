@@ -14,9 +14,8 @@ Rule for every task: do not break the existing workflow or architecture; test be
 
 | Step | What you do | Done? |
 |------|-------------|-------|
-| 12-13 | Pages switched to Actions; app-only site published and verified | Yes |
-| 14 | Security step S1 (database rules, tested) | Yes |
-| 15 | Reply "go" for S2: the app logs in through Supabase Auth on staging. I will first tell you in plain words what you will create in the Supabase dashboard (one test admin) | No |
+| 15 | **STAGING project only.** (a) Supabase > Authentication > Users > Add user > Create new user: email `admin@test.dawam.arwaenterprises.com`, password `Test@1234`, tick "Auto Confirm User". (b) SQL Editor > New query > paste the WHOLE file `supabase/staging-security-bundle.sql` > Run. It should show `admin@test.dawam.arwaenterprises.com`. Then reply "done" | No |
+| 16 | (after 15) Authentication settings: turn OFF "Allow new users to sign up" (I will tell you where) | No |
 
 Parked, not forgotten: licence of the update icon picture (step 11).
 
@@ -120,7 +119,7 @@ Design (decided by me, to confirm at step 2): users log in with **Supabase Auth*
 | # | Step | Severity | Status |
 |---|------|----------|--------|
 | S1 | Database rules: each client sees and changes only its own rows; public key gets nothing; password hashes unreadable; clients cannot edit subscriptions; audit log append-only; functions check the caller. File `supabase/migrations/001_security_foundation.sql`. **118 checks pass on a local Postgres 16** (`bash tests/db/run.sh`, also in CI); a deliberately loosened rule makes them fail. NOT applied to any Supabase project yet (it would stop the current app) | Critical | Done (tested locally) |
-| S2 | App login with Supabase Auth on staging; single admin per client; Users page removed; app pages work under the new rules; baseline tests moved to a logged-in test user | Critical | Todo |
+| S2 | App login with Supabase Auth on staging; single admin per client; Users page removed; app pages work under the new rules; baseline tests moved to a logged-in test user. **Built:** migration 002 (one active admin per company, usernames/settings per company, subscription/expiry enforced by the database, `link_admin_profile` for the platform owner), `loginSupabase` in auth.js (one general error message, this-device-only logout, session check on every page), Users tile/page gone with the new login, tests: 21 database checks + dry run of the exact staging procedure, 5 environment checks, 12 end-to-end login/lock-out checks (`tests/auth.test.js`). The new login is **staging-only** (`DAWAM_AUTH_MODE`); the live site keeps the old login until S5. **Waiting for:** owner applies the staging bundle (step 15), then I run the browser tests and fix what they find | Critical | In progress |
 | S3 | Punch terminal: per-client terminal key + narrow functions (face data, settings, punch save, sync) so the terminal works without an open database | Critical | Todo |
 | S4 | Punch photos private (signed links); labor self-enrollment page through a safe function; storage rules | High | Todo |
 | S5 | Login attempt limits, audit review, remove the temporary open policies, **live cutover plan** (migrate the live admin accounts, switch the live project) with a rollback | Critical | Todo |

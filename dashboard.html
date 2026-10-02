@@ -94,12 +94,12 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="js/config/supabase.js?v=73"></script>
-    <script src="js/auth/auth.js?v=73"></script>
-    <script src="js/utils/date-utils.js?v=73"></script>
-    <script src="js/ui/sync-indicator.js?v=73"></script>
-    <script src="js/ui/toast.js?v=73"></script>
-    <script src="js/api/report-api.js?v=73"></script>
+    <script src="js/config/supabase.js?v=74"></script>
+    <script src="js/auth/auth.js?v=74"></script>
+    <script src="js/utils/date-utils.js?v=74"></script>
+    <script src="js/ui/sync-indicator.js?v=74"></script>
+    <script src="js/ui/toast.js?v=74"></script>
+    <script src="js/api/report-api.js?v=74"></script>
 
     <script>
         // Require login
@@ -135,6 +135,11 @@
                     { title: 'Punch Locations', desc: 'Manage locations', icon: '📍', link: 'attendance/punch-locations.html', class: 'tile-red' },
                     { title: 'Settings', desc: 'System settings', icon: '⚙️', link: 'admin/settings.html', class: 'tile-teal' }
                 );
+            }
+
+            // One admin per company: the Users page is gone with the new login
+            if (DAWAM_AUTH_MODE === 'supabase') {
+                for (let i = tiles.length - 1; i >= 0; i--) if (tiles[i].link === 'admin/users.html') tiles.splice(i, 1);
             }
 
             // Common tiles for Admin and Supervisor
@@ -299,6 +304,6 @@
             }
         }
     </script>
-    <script src="js/ui/app-update.js?v=73"></script>
+    <script src="js/ui/app-update.js?v=74"></script>
 </body>
 </html>

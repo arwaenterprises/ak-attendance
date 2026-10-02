@@ -21,8 +21,91 @@ const AUTH = {
         return /^[a-f0-9]{64}$/.test(value);
     },
 
-    // Login user with client code
+    // Login: company code + username + password (unchanged for the person). Which system checks it depends on DAWAM_AUTH_MODE.
     async login(clientCode, username, password) {
+        return DAWAM_AUTH_MODE === 'supabase'
+            ? this.loginSupabase(clientCode, username, password)
+            : this.loginLegacy(clientCode, username, password);
+    },
+
+    // New login (Supabase Auth). The database decides what this person may see (see supabase/migrations).
+    async loginSupabase(clientCode, username, password) {
+        const code = String(clientCode || '').toUpperCase().trim();
+        const user = String(username || '').toLowerCase().trim();
+        const invalid = { success: false, error: 'Invalid company code, username or password' };   // one message for every cause: no hints for guessers
+        try {
+            if (!/^[a-z0-9._-]+$/i.test(code) || !/^[a-z0-9._-]+$/.test(user) || !password) return invalid;
+            const email = `${user}@${code.toLowerCase()}.${DAWAM_LOGIN_EMAIL_DOMAIN}`;
+            const { data: auth, error: authError } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (authError || !auth || !auth.user) {
+                if (authError && (authError.status === 429 || /rate limit/i.test(authError.message || ''))) {
+                    return { success: false, error: 'Too many attempts. Please wait a few minutes and try again.' };
+                }
+                if (authError && /fetch|network/i.test(authError.message || '')) {
+                    return { success: false, error: 'Cannot connect to server. Check internet connection.' };
+                }
+                return invalid;
+            }
+
+            // Profile and company: the database only shows this person their own rows
+            const { data: userData } = await supabaseClient.from('users')
+                .select('id, username, name, role, department_id, status, client_id, permissions')
+                .eq('auth_id', auth.user.id).maybeSingle();
+            if (!userData) {
+                await supabaseClient.auth.signOut({ scope: 'local' });
+                return { success: false, error: 'This login is not linked to a company yet. Contact support.' };
+            }
+            const { data: clientData } = await supabaseClient.from('clients')
+                .select('id, business_name, business_name_ar, logo_url, subscription_status, subscription_tier, subscription_end_date, is_active')
+                .eq('id', userData.client_id).maybeSingle();
+            const expiredMessage = 'Your subscription has expired or the account is inactive. Contact Arwa Enterprises: +91 7021229209';
+            if (!clientData) {                       // the database hides the company of an expired / inactive account
+                await supabaseClient.auth.signOut({ scope: 'local' });
+                return { success: false, error: expiredMessage };
+            }
+            if (!clientData.is_active) {
+                await supabaseClient.auth.signOut({ scope: 'local' });
+                return { success: false, error: 'This account has been deactivated. Contact support.' };
+            }
+            const subscriptionCheck = this.checkSubscriptionStatus(clientData);
+            if (!subscriptionCheck.valid) {
+                await supabaseClient.auth.signOut({ scope: 'local' });
+                return { success: false, error: subscriptionCheck.message };
+            }
+
+            const session = {
+                userId: userData.id,
+                username: userData.username,
+                name: userData.name,
+                role: userData.role,
+                departmentId: userData.department_id,
+                permissions: userData.permissions || {},
+                clientId: clientData.id,
+                clientCode: code,
+                clientName: clientData.business_name,
+                clientNameAr: clientData.business_name_ar,
+                clientLogo: clientData.logo_url,
+                clientTier: clientData.subscription_tier,
+                clientStatus: clientData.subscription_status,
+                loginTime: new Date().toISOString()
+            };
+            // This copy only drives the screens (names, menus). It is never trusted for access: the database checks every request.
+            localStorage.setItem(this.SESSION_KEY, JSON.stringify(session));
+            localStorage.setItem('client_id', clientData.id);
+            localStorage.setItem('client_code', code);
+            localStorage.setItem('client_name', clientData.business_name);
+            if (clientData.logo_url) localStorage.setItem('client_logo', clientData.logo_url);
+
+            await this.logAction('LOGIN', 'users', userData.id, null, { username: userData.username, client_id: clientData.id, client_code: code });
+            return { success: true, user: session };
+        } catch (error) {
+            console.error('Login error:', error);
+            return { success: false, error: 'Login failed. Check internet connection.' };
+        }
+    },
+
+    // Old login (kept for the live site until the cutover): reads the user table in the browser.
+    async loginLegacy(clientCode, username, password) {
         try {
             // First, find the client by code
             const { data: clientData, error: clientError } = await supabaseClient
@@ -154,6 +237,12 @@ const AUTH = {
             });
         }
         
+        // New login: end this device's session only (other devices using the same login stay signed in)
+        this._loggingOut = true;
+        if (DAWAM_AUTH_MODE === 'supabase') {
+            try { await supabaseClient.auth.signOut({ scope: 'local' }); } catch (e) { /* clear the screen copy anyway */ }
+        }
+
         // Clear all session data
         localStorage.removeItem(this.SESSION_KEY);
         localStorage.removeItem('client_id');
@@ -330,6 +419,29 @@ const AUTH = {
         document.title = document.title.replace('Attendance', clientInfo.name + ' - Attendance');
     }
 };
+
+// New login: the screen copy of the session is only valid while the Auth session behind it is valid
+// (expired for good, signed out elsewhere, refresh refused). Otherwise go back to the login page.
+AUTH.endSessionAndGoToLogin = function () {
+    localStorage.removeItem(AUTH.SESSION_KEY);
+    localStorage.removeItem('client_id');
+    localStorage.removeItem('client_code');
+    localStorage.removeItem('client_name');
+    localStorage.removeItem('client_logo');
+    window.location.href = AUTH.getBasePath() + 'index.html';
+};
+if (DAWAM_AUTH_MODE === 'supabase') {
+    document.addEventListener('DOMContentLoaded', async function () {
+        if (!AUTH.isLoggedIn()) return;
+        try {
+            const { data } = await supabaseClient.auth.getSession();
+            if (!data || !data.session) AUTH.endSessionAndGoToLogin();
+        } catch (e) { /* offline: keep working; the next online request refreshes or ends the session */ }
+    });
+    supabaseClient.auth.onAuthStateChange(function (event) {
+        if (event === 'SIGNED_OUT' && !AUTH._loggingOut && AUTH.isLoggedIn()) AUTH.endSessionAndGoToLogin();
+    });
+}
 
 // Auto-display client branding when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
