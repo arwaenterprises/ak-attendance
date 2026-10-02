@@ -79,8 +79,14 @@ jobs:
             
             for (const record of records) {
               try {
+                // new login: the stored value is the file path itself; old login: a public web address
+                if (!/^https?:\/\//.test(record.photo_url)) {
+                  filePaths.push(record.photo_url);
+                  recordMap.set(record.photo_url, record);
+                  continue;
+                }
                 const url = new URL(record.photo_url);
-                const pathMatch = url.pathname.match(/\/storage\/v1\/object\/public\/punch-photos\/(.+)/);
+                const pathMatch = url.pathname.match(/\/storage\/v1\/object\/(?:public\/)?punch-photos\/(.+)/);
                 
                 if (pathMatch) {
                   const filePath = pathMatch[1];

@@ -353,15 +353,16 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="../js/config/supabase.js?v=75"></script>
-    <script src="../js/auth/auth.js?v=75"></script>
-    <script src="../js/utils/date-utils.js?v=75"></script>
-    <script src="../js/utils/csv-handler.js?v=75"></script>
-    <script src="../js/ui/sync-indicator.js?v=75"></script>
-    <script src="../js/ui/toast.js?v=75"></script>
-    <script src="../js/api/department-api.js?v=75"></script>
-    <script src="../js/api/labor-api.js?v=75"></script>
-    <script src="../js/api/enrollment-api.js?v=75"></script>
+    <script src="../js/config/supabase.js?v=76"></script>
+    <script src="../js/auth/auth.js?v=76"></script>
+    <script src="../js/utils/date-utils.js?v=76"></script>
+    <script src="../js/utils/csv-handler.js?v=76"></script>
+    <script src="../js/ui/sync-indicator.js?v=76"></script>
+    <script src="../js/ui/toast.js?v=76"></script>
+    <script src="../js/api/department-api.js?v=76"></script>
+    <script src="../js/api/labor-api.js?v=76"></script>
+    <script src="../js/utils/photo-url.js?v=76"></script>
+    <script src="../js/api/enrollment-api.js?v=76"></script>
 
     <script>
         // Require login
@@ -880,7 +881,7 @@
                     const submittedAt = new Date(item.submitted_at).toLocaleString();
                     html += `
                         <div class="pending-item" id="pending-${item.id}">
-                            <img src="${item.photo_url}" class="pending-photo" alt="Photo">
+                            <img src="${PhotoURL.src(item.photo_url)}" data-photo="${item.photo_url}" class="pending-photo" alt="Photo">
                             <div class="pending-info">
                                 <div class="name">${item.labor_name || 'Unknown'}</div>
                                 <div class="details">${item.labor_id}</div>
@@ -895,6 +896,7 @@
                 });
 
                 document.getElementById('pendingList').innerHTML = html;
+                PhotoURL.hydrate(document.getElementById('pendingList'));
             } catch (e) {
                 document.getElementById('pendingList').innerHTML = `<p class="text-center text-danger">Failed to load: ${e.message}</p>`;
             }
@@ -954,6 +956,6 @@
         loadData();
         loadPendingCount();
     </script>
-    <script src="../js/ui/app-update.js?v=75"></script>
+    <script src="../js/ui/app-update.js?v=76"></script>
 </body>
 </html>
