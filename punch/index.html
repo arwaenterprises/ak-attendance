@@ -581,15 +581,15 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="../js/config/supabase.js?v=79"></script>
-    <script src="../js/utils/date-utils.js?v=79"></script>
-    <script src="../js/utils/photo-utils.js?v=79"></script>
-    <script src="../js/utils/offline-storage.js?v=79"></script>
-    <script src="../js/utils/sync-manager.js?v=79"></script>
-    <script src="../js/api/labor-api.js?v=79"></script>
-    <script src="../js/api/punch-api.js?v=79"></script>
-    <script src="../js/api/terminal-api.js?v=79"></script>
-    <script src="../js/utils/photo-url.js?v=79"></script>
+    <script src="../js/config/supabase.js?v=80"></script>
+    <script src="../js/utils/date-utils.js?v=80"></script>
+    <script src="../js/utils/photo-utils.js?v=80"></script>
+    <script src="../js/utils/offline-storage.js?v=80"></script>
+    <script src="../js/utils/sync-manager.js?v=80"></script>
+    <script src="../js/api/labor-api.js?v=80"></script>
+    <script src="../js/api/punch-api.js?v=80"></script>
+    <script src="../js/api/terminal-api.js?v=80"></script>
+    <script src="../js/utils/photo-url.js?v=80"></script>
 
     <script>
         // ============ ONE SCREEN, NO SCROLL ============
@@ -1126,29 +1126,39 @@ localStorage.setItem('pwa_client_code', clientCode);
                     }
                 }
 
-                // Determine what the records allow next
+                // Ask the database first (it holds the IN / OUT rules). Offline or an older database: the page checks with what it knows.
                 let punchType;
-                if (isOfflineMode) {
-                    const unsyncedPunches = await OfflineStorage.getUnsyncedPunches();
-                    const todayPunches = unsyncedPunches.filter(p => 
-                        p.laborId === currentLabor.labor_id && p.date === DateUtils.today()
-                    );
-                    const lastPunch = todayPunches[todayPunches.length - 1];
-                    punchType = (!lastPunch || lastPunch.type === 'logout') ? 'login' : 'logout';
-                } else {
-                    punchType = await (DAWAM_AUTH_MODE === 'supabase' ? TerminalAPI : PunchAPI).getNextPunchType(currentLabor.labor_id);
+                let checked = false;
+                if (DAWAM_AUTH_MODE === 'supabase' && !isOfflineMode && navigator.onLine) {
+                    const chk = await TerminalAPI.checkPunch(currentLabor.labor_id, kind, DateUtils.today(), DateUtils.now());
+                    if (chk.success) {
+                        checked = true;
+                        if (!chk.allowed) {
+                            showStatus('warn', chk.message || 'Punch not allowed', '', `<span class="who">${currentLabor.name}</span>This punch was not recorded.`);
+                            scheduleReset(7000);
+                            return;
+                        }
+                    }
                 }
+                if (!checked) {
+                    if (isOfflineMode) {
+                        const unsyncedPunches = await OfflineStorage.getUnsyncedPunches();
+                        const todayPunches = unsyncedPunches.filter(p => 
+                            p.laborId === currentLabor.labor_id && p.date === DateUtils.today()
+                        );
+                        const lastPunch = todayPunches[todayPunches.length - 1];
+                        punchType = (!lastPunch || lastPunch.type === 'logout') ? 'login' : 'logout';
+                    } else {
+                        punchType = await (DAWAM_AUTH_MODE === 'supabase' ? TerminalAPI : PunchAPI).getNextPunchType(currentLabor.labor_id);
+                    }
 
-                // The labor pressed IN or OUT: refuse repeated and mismatched punches with a clear message (nothing is recorded)
-                if (kind === 'login' && punchType === 'logout') {
-                    showStatus('warn', 'You have logged in for the day', '', `<span class="who">${currentLabor.name}</span>This punch was not recorded.`);
-                    scheduleReset(7000);
-                    return;
-                }
-                if (kind === 'logout' && punchType === 'login') {
-                    showStatus('warn', 'Please punch IN first', '', `<span class="who">${currentLabor.name}</span>No open IN was found. This punch was not recorded.`);
-                    scheduleReset(7000);
-                    return;
+                    // The labor pressed IN or OUT: refuse repeated and mismatched punches with a clear message (nothing is recorded)
+                    if (kind === 'login' && punchType === 'logout') {
+                        showStatus('warn', 'You have logged in for the day', '', `<span class="who">${currentLabor.name}</span>This punch was not recorded.`);
+                        scheduleReset(7000);
+                        return;
+                    }
+                    // (an OUT is never refused from today's list alone: a night-shift OUT after midnight has no IN today. The database decides.)
                 }
                 punchType = kind;
                 showStatus('info', 'Saving', '', 'Recording your punch...');
@@ -1181,6 +1191,11 @@ localStorage.setItem('pwa_client_code', clientCode);
                     delete punchData.photoBlob;
 
                     const saveResult = await (DAWAM_AUTH_MODE === 'supabase' ? TerminalAPI : PunchAPI).savePunchCompat(punchData);
+                    if (saveResult.rejected) {
+                        showStatus('warn', saveResult.error || 'Punch not allowed', '', `<span class="who">${currentLabor.name}</span>This punch was not recorded.`);
+                        scheduleReset(7000);
+                        return;
+                    }
                     if (!saveResult.success) {
                         punchData.photoBlob = photoBlob;
                         await OfflineStorage.savePunch(punchData);
@@ -1535,7 +1550,7 @@ localStorage.setItem('pwa_client_code', clientCode);
             updateLocationBar('Offline mode - Punches will sync later', true);
         });
     </script>
-    <script src="../js/ui/app-update.js?v=79"></script>
-    <script src="../js/ui/pwa-install.js?v=79"></script>
+    <script src="../js/ui/app-update.js?v=80"></script>
+    <script src="../js/ui/pwa-install.js?v=80"></script>
 </body>
 </html>

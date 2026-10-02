@@ -375,6 +375,11 @@ const SyncManager = {
                     }
                     const res = await TerminalAPI.recordPunch({ ...punch, photoUrl });
                     if (res.success) await OfflineStorage.markPunchSynced(punch.id);
+                    else if (res.rejected) {
+                        // refused by the IN / OUT rules (repeat, mismatch, 4-hour lock): final answer, so it is not retried for ever
+                        console.warn(`[SyncManager] Punch ${punch.id} refused by the rules (${res.code}): ${res.error}`);
+                        await OfflineStorage.markPunchSynced(punch.id);
+                    }
                     else console.error(`[SyncManager] Punch ${punch.id} not accepted:`, res.error);
                 } catch (err) {
                     console.error(`[SyncManager] Failed to sync punch ${punch.id}:`, err);
