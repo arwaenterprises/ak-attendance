@@ -33,7 +33,9 @@ Rule for every task: do not break the existing workflow or architecture; test be
 |---|------|----------|--------|
 | 1 | Write baseline tests of today's behaviour (punch, offline sync, night shift, reports) against a fake Supabase, run them green BEFORE any change | High | Todo |
 | 2 | Set up a free second Supabase project (new/staging), so real-database checks never touch live data. Owner creates it; guide in chat | High | In progress (owner creating) |
-| 2a | Export the REAL schema from the current Supabase (tables, policies, functions) with `supabase/export-schema.sql`, then build `supabase/schema.sql` from it. The code alone shows 16 tables and 2 functions but not column types, rules or security policies | High | Waiting for owner to run the export |
+| 2a | Export the REAL schema and build `supabase/schema.sql` from it | High | Done (export received 2026-10-02; schema.sql written, NOT yet run on any project) |
+| 2c | Run `supabase/schema.sql` then `supabase/policies-temporary-open.sql` on the NEW project and report any error. Hand-converted, untested | High | Todo (owner) |
+| 2d | Create staging data on the new project: one client, one admin user, settings keys (night_shift_start/end, min hours, confidence thresholds, punch limit). Data is not in the export | High | Todo |
 | 2b | Keep `supabase/schema.sql` updated with every database change from now on (see D8) | Medium | Todo |
 | 3 | Add CI (GitHub Actions) running the tests and static checks on every push | Medium | Todo |
 
@@ -105,7 +107,7 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 
 | # | Finding | Severity | Status |
 |---|---------|----------|--------|
-| 29 | **Login runs in the browser.** The app reads each user's `password_hash` from the `users` table in the browser. For that to work, anyone holding the public anon key (it is in `js/config/supabase.js`, which is normal) can likely read every client's password hashes. Verify RLS on `users`. Fix: move login into a server-side database function / Supabase Auth, never send hashes to the browser | Critical | Todo (verify) |
+| 29 | **(CONFIRMED by export, see 43)** **Login runs in the browser.** The app reads each user's `password_hash` from the `users` table in the browser. For that to work, anyone holding the public anon key (it is in `js/config/supabase.js`, which is normal) can likely read every client's password hashes. Verify RLS on `users`. Fix: move login into a server-side database function / Supabase Auth, never send hashes to the browser | Critical | Todo (verify) |
 | 30 | **Tenant isolation depends on the browser.** `client_id` comes from localStorage and every query filters on it in JavaScript. If RLS does not enforce it, a user can change `client_id` and read or write another client's data. Verify RLS on every table. Fix: RLS rules tied to the logged-in user | Critical | Todo (verify) |
 | 31 | **Role and permissions live in localStorage** (`ak_attendance_session`) and can be edited by the user. Real enforcement must be in the database | Critical | Todo (verify) |
 | 32 | **Weak password storage.** Fast SHA-256 with the username as salt is easy to crack if hashes leak. A plaintext-password fallback is still in the login code. Fix: remove the fallback, migrate to a proper password hashing scheme (Supabase Auth) | High | Todo |
@@ -119,6 +121,20 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 | 40 | `service role` key is only used in the GitHub workflow secret (good). Confirm it is never in the repo or browser code | Low | Todo |
 | 41 | Subscription messages contain a hard-coded phone number; move to client/platform settings | Low | Todo |
 | 42 | Add an audit log review: login, password change, shift change, freeze day all recorded with who/when | Medium | Todo |
+
+### Findings from the real database export (2026-10-02) - these CONFIRM the Critical items above
+
+| # | Finding | Severity | Status |
+|---|---------|----------|--------|
+| 43 | **Every attendance table is open to anyone with the public key.** Row-level security is switched on, but every policy is "allow all" (`true`) for anon. Tables `users`, `clients`, `labor_id_sequence` have security fully OFF. Anyone can read all password hashes, face data, salaries and photos, and change or delete any record of any client. This confirms tasks 29, 30, 31 | Critical | Todo (first real fix; needs login moved server-side) |
+| 44 | **`clients` is writable by anyone** (security off). A person could mark their own company as premium / never-expiring, or deactivate another client. Confirms task 26 is a real hole, not just a gap | Critical | Todo |
+| 45 | **Storage: anon can list, upload and DELETE every punch photo**, and the bucket is public. Anyone could wipe all photos | High | Todo |
+| 46 | **The live project is shared with other apps** (pharmacy tables, an expense tracker, `admin_users`, and a shared `clients` table with `pharmacy_tier`, `subscribed_apps`). Attendance should have its own project, which the new Supabase project gives us. The other apps keep running on the live project | Medium | Decided: attendance-only on the new project |
+| 47 | **Multi-client design flaws in the database:** `settings` primary key is `key` alone, so two clients cannot both have a `night_shift_start`; `users.username`, `departments.code`, `laborers.labor_id` and `iqama_number` are unique across ALL clients, so two clients cannot use the same username or department code; labor IDs come from one global counter | High | Todo (migration) |
+| 48 | **`update_daily_attendance` uses the earliest and latest punch time of a date** and fixed fallback hours (570 and 240 minutes) instead of your settings. I believe night shifts and the new IN/OUT lock need this rewritten. It runs with elevated rights and anyone can call it for any labor. Verify against real night-shift data | High | Todo |
+| 49 | The code reads a table `frozen_dates` that does not exist in the database (the app also uses `attendance_freeze`). Find out which one is real | Low | Todo |
+| 50 | `punch_records`, `attendance_freeze`, `holidays`, `ot_rates`, `overtime_records` and `enrollment_links` have no link (foreign key) to `clients`, and `punch_records` has no rule stopping duplicate or too-close punches. The 4-hour lock must be added at database level | Medium | Todo |
+| 51 | `admin_users` table: attendance code does not use it. Confirm it belongs to another app before leaving it behind | Low | Needs your answer |
 
 ---
 
@@ -147,4 +163,5 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 | Date | Change |
 |------|--------|
 | 2026-10-02 | Roadmap created from the code review. No application code changed yet. |
+| 2026-10-02 | Real database export received; `supabase/schema.sql` and `policies-temporary-open.sql` written; findings 43-51 added (security is worse than the code review suggested). |
 | 2026-10-02 | Added 4-hour lock rule (tasks 20-24a), schema tasks (2a, 2b), `supabase/` folder with export query and schema skeleton. |
