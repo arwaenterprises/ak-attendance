@@ -46,7 +46,7 @@ const ReportAPI = {
 
             let laborQuery = supabaseClient
                 .from('laborers')
-                .select('labor_id, name, iqama_number, department_id, date_of_joining, status, role')
+                .select('labor_id, name, iqama_number, department_id, date_of_joining, status, role, shift_id')
                 .eq('client_id', clientId)
                 .eq('status', 'active')
                 .limit(2000);
@@ -84,7 +84,7 @@ const ReportAPI = {
             while (true) {
                 let punchQ = supabaseClient
                     .from('punch_records')
-                    .select('labor_id, date, time, location_name, is_night_shift_end')
+                    .select('labor_id, date, time, location_name, is_night_shift_end, early_out, early_minutes')
                     .eq('client_id', clientId)
                     .gte('date', fromDate)
                     .lte('date', toDate)
@@ -111,18 +111,40 @@ const ReportAPI = {
                 .gte('date', bufferFromStr)
                 .lte('date', bufferToStr);
 
+            // Shifts and the history of moves (a report must still work if they cannot be read)
+            const shiftQuery = supabaseClient.from('shifts').select('id, name, is_night').eq('client_id', clientId);
+            const assignQuery = supabaseClient.from('shift_assignments').select('labor_id, shift_id, from_date').eq('client_id', clientId).limit(5000);
+
             const [
                 { data: attendance, error: attError },
                 { data: departments },
-                { data: holidaysData }
-            ] = await Promise.all([attendanceQuery, deptQuery, holidayQuery]);
+                { data: holidaysData },
+                shiftRes,
+                assignRes
+            ] = await Promise.all([attendanceQuery, deptQuery, holidayQuery, shiftQuery, assignQuery]);
 
             if (attError) throw attError;
 
+            // shift of a labor on a date: the latest move up to that date, else his current shift, else the Day shift (same rule as the database)
+            const shiftMap = {};
+            (shiftRes && shiftRes.data || []).forEach(sh => { shiftMap[sh.id] = sh; });
+            const dayShift = Object.values(shiftMap).find(sh => !sh.is_night) || null;
+            const movesByLabor = {};
+            (assignRes && assignRes.data || []).forEach(a => { (movesByLabor[a.labor_id] = movesByLabor[a.labor_id] || []).push(a); });
+            Object.values(movesByLabor).forEach(list => list.sort((x, y) => (x.from_date < y.from_date ? -1 : 1)));
+            const shiftOf = (labor, dateStr) => {
+                let id = null;
+                for (const m of (movesByLabor[labor.labor_id] || [])) { if (m.from_date <= dateStr) id = m.shift_id; else break; }
+                id = id || labor.shift_id || (dayShift && dayShift.id) || null;
+                return shiftMap[id] || null;
+            };
+
+            const earlyMap = {};
             const punchLocationMap = {};
             const punchTimeMap = {};
             allPunches.forEach(p => {
                 const key = `${p.labor_id}_${p.date}`;
+                if (p.early_out) earlyMap[key] = Math.max(earlyMap[key] || 0, p.early_minutes || 0);
                 if (!punchLocationMap[key]) punchLocationMap[key] = p.location_name || '';
                 if (!punchTimeMap[key]) punchTimeMap[key] = { firstIn: null, lastOut: null, nightEnd: null };
                 if (p.is_night_shift_end) {
@@ -209,6 +231,10 @@ const ReportAPI = {
                             iqamaNumber: labor.iqama_number,
                             departmentName: deptMap[labor.department_id] || '-',
                             punchLocation: punchLocationMap[key] || '',
+                            shiftName: (shiftOf(labor, dateStr) || {}).name || '',
+                            isNightShift: !!(shiftOf(labor, dateStr) || {}).is_night,
+                            earlyOut: key in earlyMap,
+                            earlyMinutes: earlyMap[key] || 0,
                             hasRecord: true,
                             isFriday
                         });
@@ -234,6 +260,10 @@ const ReportAPI = {
                             iqamaNumber: labor.iqama_number,
                             departmentName: deptMap[labor.department_id] || '-',
                             punchLocation: '',
+                            shiftName: (shiftOf(labor, dateStr) || {}).name || '',
+                            isNightShift: !!(shiftOf(labor, dateStr) || {}).is_night,
+                            earlyOut: false,
+                            earlyMinutes: 0,
                             hasRecord: false,
                             isFriday
                         });

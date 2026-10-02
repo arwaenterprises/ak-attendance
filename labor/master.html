@@ -179,6 +179,7 @@
                             <th>Date of Joining</th>
                             <th>Nationality</th>
                             <th>Department</th>
+                            <th>Shift</th>
                             <th>Status</th>
                             <th>Face</th>
                             <th>Last Sync</th>
@@ -192,6 +193,11 @@
                             <th><input type="text" class="col-filter" id="filterNationality" placeholder="Search..." onkeyup="applyFilters()"></th>
                             <th>
                                 <select class="col-filter" id="departmentFilter" onchange="applyFilters()">
+                                    <option value="">All</option>
+                                </select>
+                            </th>
+                            <th>
+                                <select class="col-filter" id="shiftFilter" onchange="applyFilters()">
                                     <option value="">All</option>
                                 </select>
                             </th>
@@ -216,7 +222,7 @@
                     </thead>
                     <tbody id="laborTable">
                         <tr>
-                            <td colspan="10" class="text-center p-20">Loading...</td>
+                            <td colspan="11" class="text-center p-20">Loading...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -353,16 +359,17 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="../js/config/supabase.js?v=87"></script>
-    <script src="../js/auth/auth.js?v=87"></script>
-    <script src="../js/utils/date-utils.js?v=87"></script>
-    <script src="../js/utils/csv-handler.js?v=87"></script>
-    <script src="../js/ui/sync-indicator.js?v=87"></script>
-    <script src="../js/ui/toast.js?v=87"></script>
-    <script src="../js/api/department-api.js?v=87"></script>
-    <script src="../js/api/labor-api.js?v=87"></script>
-    <script src="../js/utils/photo-url.js?v=87"></script>
-    <script src="../js/api/enrollment-api.js?v=87"></script>
+    <script src="../js/config/supabase.js?v=88"></script>
+    <script src="../js/auth/auth.js?v=88"></script>
+    <script src="../js/utils/date-utils.js?v=88"></script>
+    <script src="../js/utils/csv-handler.js?v=88"></script>
+    <script src="../js/ui/sync-indicator.js?v=88"></script>
+    <script src="../js/ui/toast.js?v=88"></script>
+    <script src="../js/api/department-api.js?v=88"></script>
+    <script src="../js/api/labor-api.js?v=88"></script>
+    <script src="../js/api/shift-api.js?v=88"></script>
+    <script src="../js/utils/photo-url.js?v=88"></script>
+    <script src="../js/api/enrollment-api.js?v=88"></script>
 
     <script>
         // Require login
@@ -383,6 +390,16 @@
             }
         }
 
+        // Shifts (Day / Night) for the Shift column and filter
+        let shifts = [];
+        function dayShiftId() { const d = shifts.find(x => !x.is_night); return d ? d.id : null; }
+        function shiftBadgeHtml(id) {
+            const sh = shifts.find(x => x.id === (id || dayShiftId()));
+            if (!sh) return '-';
+            const name = String(sh.name).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+            return `<span class="badge" style="background:${sh.is_night ? '#2d3748' : '#fefcbf'};color:${sh.is_night ? '#fff' : '#744210'};">${name}</span>`;
+        }
+
         // Load data
         async function loadData() {
             try {
@@ -394,6 +411,15 @@
                     departments = deptResult.data;
                     populateDepartmentDropdowns();
                 }
+
+                // Load shifts (the page still works if they cannot be read)
+                try {
+                    const shiftResult = await ShiftAPI.getAll();
+                    if (shiftResult.success) {
+                        shifts = shiftResult.data;
+                        document.getElementById('shiftFilter').innerHTML = '<option value="">All</option>' + shifts.map(x => `<option value="${x.id}">${String(x.name).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))}</option>`).join('');
+                    }
+                } catch (e) { console.warn('Shifts not available', e); }
 
                 // Load laborers
                 const laborResult = await LaborAPI.getAll();
@@ -413,7 +439,7 @@
                 SyncIndicator.hide();
                 Toast.error('Failed to load data: ' + error.message);
                 document.getElementById('laborTable').innerHTML = `
-                    <tr><td colspan="10" class="text-center p-20 text-danger">
+                    <tr><td colspan="11" class="text-center p-20 text-danger">
                         ❌ Failed to load. Check internet connection.
                     </td></tr>
                 `;
@@ -457,6 +483,7 @@
             const deptFilter = document.getElementById('departmentFilter').value;
             const statusFilter = document.getElementById('statusFilter').value;
             const faceFilter = document.getElementById('faceFilter').value;
+            const shiftFilter = document.getElementById('shiftFilter').value;
 
             filteredLaborers = laborers.filter(labor => {
                 const matchId = !searchId || labor.labor_id.toLowerCase().includes(searchId);
@@ -464,13 +491,14 @@
                 const matchIqama = !searchIqama || labor.iqama_number.includes(searchIqama);
                 const matchNat = !searchNat || (labor.nationality || '').toLowerCase().includes(searchNat);
                 const matchDept = !deptFilter || labor.department_id === deptFilter;
+                const matchShift = !shiftFilter || (labor.shift_id || (dayShiftId())) === shiftFilter;
                 const matchStatus = !statusFilter || labor.status === statusFilter;
                 let matchFace = true;
                 if (faceFilter === 'enrolled') matchFace = labor.face_enrolled && !labor.needs_reenrollment;
                 else if (faceFilter === 'not-enrolled') matchFace = !labor.face_enrolled;
                 else if (faceFilter === 'needs-reenroll') matchFace = labor.needs_reenrollment;
 
-                return matchId && matchName && matchIqama && matchNat && matchDept && matchStatus && matchFace;
+                return matchId && matchName && matchIqama && matchNat && matchDept && matchShift && matchStatus && matchFace;
             });
 
             renderTable();
@@ -482,7 +510,7 @@
 
             if (filteredLaborers.length === 0) {
                 tbody.innerHTML = `
-                    <tr><td colspan="10" class="text-center p-20 text-muted">
+                    <tr><td colspan="11" class="text-center p-20 text-muted">
                         No laborers found. ${session.role !== 'supervisor' ? 'Click "Add Labor" to create one.' : ''}
                     </td></tr>
                 `;
@@ -543,6 +571,7 @@
                         <td>${DateUtils.formatDate(labor.date_of_joining)}</td>
                         <td>${labor.nationality}</td>
                         <td>${labor.departments?.name || '-'}</td>
+                        <td>${shiftBadgeHtml(labor.shift_id)}</td>
                         <td>
                             <span class="badge badge-${labor.status === 'active' ? 'active' : 'inactive'}">
                                 ${labor.status}
@@ -956,6 +985,6 @@
         loadData();
         loadPendingCount();
     </script>
-    <script src="../js/ui/app-update.js?v=87"></script>
+    <script src="../js/ui/app-update.js?v=88"></script>
 </body>
 </html>

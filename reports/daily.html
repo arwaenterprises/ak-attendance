@@ -280,6 +280,11 @@
                                     <option value="">All</option>
                                 </select>
                             </th>
+                            <th>Shift
+                                <select id="cfShift" class="col-filter" onchange="applyColumnFilters()">
+                                    <option value="">All</option>
+                                </select>
+                            </th>
                             <th>Role<input type="text" id="cfRole" class="col-filter" placeholder="Filter…" oninput="applyColumnFilters()"></th>
                             <th>Location<input type="text" id="cfLocation" class="col-filter" placeholder="Filter…" oninput="applyColumnFilters()"></th>
                             <th>Is Punch
@@ -332,7 +337,7 @@
                     </thead>
                     <tbody id="reportTable">
                         <tr>
-                            <td colspan="17" class="text-center p-20 text-muted">
+                            <td colspan="18" class="text-center p-20 text-muted">
                                 Select date range and click "Generate"
                             </td>
                         </tr>
@@ -429,16 +434,16 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="../js/config/supabase.js?v=87"></script>
-    <script src="../js/auth/auth.js?v=87"></script>
-    <script src="../js/utils/date-utils.js?v=87"></script>
-    <script src="../js/utils/csv-handler.js?v=87"></script>
-    <script src="../js/ui/sync-indicator.js?v=87"></script>
-    <script src="../js/ui/toast.js?v=87"></script>
-    <script src="../js/api/department-api.js?v=87"></script>
-    <script src="../js/api/labor-api.js?v=87"></script>
-    <script src="../js/api/report-api.js?v=87"></script>
-    <script src="../js/utils/photo-url.js?v=87"></script>
+    <script src="../js/config/supabase.js?v=88"></script>
+    <script src="../js/auth/auth.js?v=88"></script>
+    <script src="../js/utils/date-utils.js?v=88"></script>
+    <script src="../js/utils/csv-handler.js?v=88"></script>
+    <script src="../js/ui/sync-indicator.js?v=88"></script>
+    <script src="../js/ui/toast.js?v=88"></script>
+    <script src="../js/api/department-api.js?v=88"></script>
+    <script src="../js/api/labor-api.js?v=88"></script>
+    <script src="../js/api/report-api.js?v=88"></script>
+    <script src="../js/utils/photo-url.js?v=88"></script>
 
     <script>
         if (!AUTH.requireLogin()) {
@@ -600,6 +605,11 @@
                 if (!result.success) throw new Error(result.error);
 
                 reportData = result.data;
+                // the shift filter offers the shifts that appear in this report
+                const shiftSel = document.getElementById('cfShift'), keepShift = shiftSel.value;
+                const shiftNames = [...new Set(reportData.map(r => r.shiftName).filter(Boolean))].sort();
+                shiftSel.innerHTML = '<option value="">All</option>' + shiftNames.map(n => `<option value="${n}">${n}</option>`).join('');
+                shiftSel.value = shiftNames.includes(keepShift) ? keepShift : '';
                 document.getElementById('summarySection').style.display = 'flex';
 
                 applyColumnFilters();
@@ -619,6 +629,7 @@
             const cfName     = (document.getElementById('cfName')?.value || '').toLowerCase();
             const cfDept     = document.getElementById('cfDept')?.value || '';
             const cfRole     = (document.getElementById('cfRole')?.value || '').toLowerCase();
+            const cfShift    = document.getElementById('cfShift')?.value || '';
             const cfLocation = (document.getElementById('cfLocation')?.value || '').toLowerCase();
             const cfPunch    = document.getElementById('cfPunch')?.value || '';
             const cfAuto     = document.getElementById('cfAuto')?.value || '';
@@ -631,6 +642,7 @@
                 if (cfId && !r.labor_id.toLowerCase().includes(cfId)) return false;
                 if (cfName && !(r.laborName || '').toLowerCase().includes(cfName)) return false;
                 if (cfDept && String(r.department_id) !== String(cfDept)) return false;
+                if (cfShift && (r.shiftName || '') !== cfShift) return false;
                 if (cfRole && !(r.role || '').toLowerCase().includes(cfRole)) return false;
                 if (cfLocation && !(r.punchLocation || '').toLowerCase().includes(cfLocation)) return false;
                 if (cfPunch === 'yes' && !r.hasRecord) return false;
@@ -666,7 +678,7 @@
             const tbody = document.getElementById('reportTable');
 
             if (filteredData.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="17" class="text-center p-20 text-muted">No records found for selected criteria</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="18" class="text-center p-20 text-muted">No records found for selected criteria</td></tr>`;
                 return;
             }
 
@@ -741,11 +753,12 @@
                         <td><strong>${record.labor_id}</strong></td>
                         <td>${record.laborName || 'Unknown'}</td>
                         <td>${record.departmentName || '-'}</td>
+                        <td>${record.shiftName ? `<span class="badge" style="background:${record.isNightShift ? '#2d3748' : '#fefcbf'};color:${record.isNightShift ? '#fff' : '#744210'};">${record.shiftName}</span>` : '-'}</td>
                         <td>${record.role || 'Labor'}</td>
                         <td>${record.punchLocation || '-'}</td>
                         <td>${isPunchBadge}</td>
                         <td>${DateUtils.formatTimeShort(record.first_login) || '-'}</td>
-                        <td>${DateUtils.formatTimeShort(record.last_logout) || '-'}</td>
+                        <td>${DateUtils.formatTimeShort(record.last_logout) || '-'}${record.earlyOut ? `<div title="Left ${record.earlyMinutes} minutes before the required hours" style="font-size:11px;color:#c05621;font-weight:700;white-space:nowrap;">⚠ Early −${Math.floor(record.earlyMinutes / 60)}h ${String(record.earlyMinutes % 60).padStart(2, '0')}m</div>` : ''}</td>
                         <td>${record.total_hours ? parseFloat(record.total_hours).toFixed(1) + 'h' : '-'}</td>
                         <td><span class="badge ${autoStatusClass}">${autoStatusText}</span></td>
                         <td><span class="badge ${finalStatusClass}">${finalStatusText}</span></td>
@@ -1113,8 +1126,10 @@
                     'Name': record.laborName || 'Unknown',
                     'Iqama': record.iqamaNumber || '-',
                     'Department': record.departmentName || '-',
+                    'Shift': record.shiftName || '-',
                     'Login': DateUtils.formatTimeShort(record.first_login) || '-',
                     'Logout': DateUtils.formatTimeShort(record.last_logout) || '-',
+                    'Early Leave (min)': record.earlyOut ? record.earlyMinutes : '',
                     'Hours': record.total_hours ? parseFloat(record.total_hours).toFixed(1) : '0',
                     'Auto Status': record.auto_status,
                     'Final Status': record.final_status,
@@ -1136,6 +1151,6 @@
         setDefaultDates();
         loadFilters();
     </script>
-    <script src="../js/ui/app-update.js?v=87"></script>
+    <script src="../js/ui/app-update.js?v=88"></script>
 </body>
 </html>
