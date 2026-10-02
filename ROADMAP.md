@@ -221,6 +221,7 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 
 | Date | Change |
 |------|--------|
+| 2026-10-02 | New punch terminal look drafted (v78, branch only, NOT live): face + ID box (phone keyboard) + IN / OUT buttons, green IN / red bye-bye OUT / amber already-logged-in screens, 7-second auto close, hides the 4-hour rule from labors. 8 new end-to-end tests (`tests/punch-ui.test.js`) pass on staging; smoke 15, update 24, environment 5 pass. Design: https://claude.ai/artifact/S732jY4pMiZUcd84dPvLFW. Decided: ID typed each time (option C); monthly view = current + previous month. Supabase usage (live, 2026-10-02): storage 0.21 of 1 GB, database 48 MB of 500 MB, egress 0.54 GB of 5 GB. |
 | 2026-10-02 | **S5 LIVE CUTOVER DONE.** Live database locked down (other apps archived, AE2/AE3 and extra locations removed, supervisors inactive), new login live for every host (v77), terminal working with the new terminal key. Owner confirmed admin login, reports and punching. Progress about 54%. |
 | 2026-10-02 | S5 window started. Auth accounts created by owner. App switch to the new login for all hosts prepared as version 77 (NOT merged until the database step is done); static, environment, update tests pass. |
 | 2026-10-02 | Owner approved clean-up: `supabase/live/000b_cleanup_live.sql` (delete AE2/AE3, keep punch locations Kaden Warehouse + Sulay, delete retired supervisors, expired enrolment links). In the cutover bundle; rehearsal covers it (all pass). Rollback does not undo it. |
