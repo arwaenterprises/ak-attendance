@@ -14,9 +14,9 @@ Rule for every task: do not break the existing workflow or architecture; test be
 
 | Step | What you do | Done? |
 |------|-------------|-------|
-| 7 | Password / user `akhtar`: left as is (your decision) | Yes |
-| 8 | Merge to live | Yes - live since 2026-10-02 16:18 UTC, version 72 |
-| 9 | Answer one question: may I set up publishing so only the app files are public (see finding 56)? It needs you to change ONE setting in GitHub (Settings > Pages > Source > "GitHub Actions"); I do everything else | No |
+| 9 | Answer one question: may I set up publishing so only the app files are public (finding 56)? It needs ONE setting change by you in GitHub (Settings > Pages > Source > "GitHub Actions") | No |
+| 10 | Say "live" and I merge the new update icon + centred install card (version 73) to the live site | No |
+| 11 | Check you have the right to use the update icon picture (it looks like a stock icon; free icon sites usually require credit). I do not have a verified source for its licence | No |
 
 Everything else is mine until I ask.
 
@@ -186,6 +186,7 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 |------|--------|
 | 2026-10-02 | Roadmap created from the code review. No application code changed yet. |
 | 2026-10-02 | Owner ran schema.sql and policies-temporary-open.sql on the new project successfully. Added `supabase/seed-staging.sql`. |
+| 2026-10-02 | Owner's own update icon (`icons/ui-update.png`) now used everywhere; on the punch terminal it sits next to "View My Attendance". Install prompt is now a centred card shown at start (Install / Not now; iPhone shows Add to Home Screen steps). Version 73. 24 update tests + 15 smoke tests pass. Not yet merged to live. |
 | 2026-10-02 | **Merged to main and LIVE (PR 9, version 72).** Verified on the live domain: sw.js v72, new login page, manifest, icons, punch page respond. Live host uses the live database (host test). Found: the whole repo is publicly served (finding 56). |
 | 2026-10-02 | Rename to Dawam Attendance (task 12), version 72, static check against leftover AK names; README default login removed (finding 55). All suites pass: static, 16 baseline, 22 update, 15 smoke. |
 | 2026-10-02 | Update mechanism built: new service worker, `app-update.js`, `pwa-install.js`, icons, manifest, `tools/bump-version.js`, static checks, 22 update tests, 15 page smoke tests. Everything passes locally: static checks, 16 baseline, 22 update, 15 smoke. Version now 71. |

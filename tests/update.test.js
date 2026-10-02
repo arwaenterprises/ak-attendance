@@ -238,9 +238,26 @@ const swVersion = Number((fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8').matc
       window.dispatchEvent(e);
     });
     await page.waitForSelector('#dawamInstallBar.show');
+    const box = await page.locator('.dawam-install-box').boundingBox(), vp = page.viewportSize();
+    ok(Math.abs(box.y + box.height / 2 - vp.height / 2) < vp.height * 0.15 && Math.abs(box.x + box.width / 2 - vp.width / 2) < vp.width * 0.1, 'install card is in the middle of the screen');
     await page.click('#dawamInstallGo');
     eq(await page.evaluate(() => window.__prompted), true, 'prompt called');
     eq(await page.locator('#dawamInstallBar.show').count(), 0, 'bar hidden after tap');
+    await ctx.close();
+  });
+  await test('"Not now" closes the install card', async () => {
+    const { ctx, page } = await open('/punch/index.html');
+    await page.evaluate(() => { const e = new Event('beforeinstallprompt', { cancelable: true }); e.prompt = () => Promise.resolve(); window.dispatchEvent(e); });
+    await page.waitForSelector('#dawamInstallBar.show'); await page.click('#dawamInstallNo');
+    eq(await page.locator('#dawamInstallBar.show').count(), 0);
+    await ctx.close();
+  });
+  await test('update icon uses the new picture and sits right next to "View My Attendance" on the punch terminal', async () => {
+    const { ctx, page } = await open('/punch/index.html?client=TEST');
+    await page.waitForFunction(() => document.querySelector('.dawam-upd-row .view-attendance-link') && document.querySelector('.dawam-upd-row #dawamUpdateBtn'));
+    eq(await page.evaluate(() => document.querySelector('#dawamUpdateBtn img').getAttribute('src')), '/icons/ui-update.png');
+    eq(await page.evaluate(() => document.querySelector('#dawamUpdateBtn').previousElementSibling.className), 'view-attendance-link', 'directly after the link');
+    eq(await page.evaluate(() => typeof openViewAttendance), 'function', 'link still works');
     await ctx.close();
   });
   await test('iPhone: shows the Add to Home Screen hint once, remembers when dismissed', async () => {
