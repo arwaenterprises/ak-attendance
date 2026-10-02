@@ -44,7 +44,7 @@ const FIXED = 'test-terminal-key-1234';
       await page.waitForFunction(() => document.getElementById('ready').style.display === 'block', null, { timeout: 20000 });
       link1 = await page.inputValue('#linkBox');
       ok(/\/punch\/index\.html\?client=TEST#key=test-terminal-key-1234$/.test(link1), link1);
-      ok(await page.locator('#qrBox svg rect').count() > 100, 'QR code drawn');
+      ok(((await page.locator('#qrBox svg path').first().getAttribute('d')) || '').length > 500, 'QR code drawn (the squares are one path)');
     });
     await test('the link opens the punch terminal on a phone that has nothing saved (the key really works)', async () => { eq(await tryLink(link1), 'started'); });
     await test('reloading the page shows the SAME link (nothing changes by looking)', async () => {
