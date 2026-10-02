@@ -14,8 +14,8 @@ Rule for every task: do not break the existing workflow or architecture; test be
 
 | Step | What you do | Done? |
 |------|-------------|-------|
-| 1-3 | NEW Supabase project: schema, temporary policies, staging seed data | Yes |
-| 4 | Send me the NEW project's Project URL and the **anon / public** key (Supabase > Project Settings > API). NEVER the service_role / secret key | No |
+| 1-4 | NEW Supabase project: schema, temporary policies, seed data, URL + anon key sent | Yes |
+| 5 | NEW Supabase project > SQL Editor > run this ONE line, then reply "ok": `create policy "tmp allow all clients" on public.clients for all to anon, authenticated using (true) with check (true);` | No |
 
 Only these steps are yours right now. Everything else is mine until I ask.
 
@@ -47,7 +47,8 @@ Only these steps are yours right now. Everything else is mine until I ask.
 | 2a | Export the REAL schema and build `supabase/schema.sql` from it | High | Done (export received 2026-10-02; schema.sql written, NOT yet run on any project) |
 | 2c | Run `supabase/schema.sql` then `supabase/policies-temporary-open.sql` on the NEW project and report any error. Both ran without errors on a local Postgres 16 (with stand-ins for Supabase's roles/storage); not yet run on real Supabase | High | Todo (owner) |
 | 2d | Create staging data on the new project: one client, one admin user, settings keys. File: `supabase/seed-staging.sql` | High | Done (owner ran it successfully) |
-| 2e | Point a staging copy of the app at the new project (different Supabase URL/key; must NOT change the live site). Plan needed for how/where staging is hosted | High | Todo |
+| 2e | Staging config: `js/config/supabase.js` and `labor/enroll-self.html` pick the new project ONLY on localhost / 127.0.0.1 / `staging.*` hosts; every other address (live site included) uses the live project. Shows a red STAGING badge. `sw.js` bumped to v69. Tested locally: contacts only the new project. Login test blocked until step 5 (missing `clients` policy, fixed in the SQL file) | High | In progress |
+| 2f | Decide where a shared staging page lives (e.g. a `staging.` address) so you can try it on a phone. Not needed yet; I test locally first | Low | Todo |
 | 2b | Keep `supabase/schema.sql` updated with every database change from now on (see D8) | Medium | Todo |
 | 3 | Add CI (GitHub Actions) running the tests and static checks on every push | Medium | Todo |
 
@@ -176,6 +177,7 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 |------|--------|
 | 2026-10-02 | Roadmap created from the code review. No application code changed yet. |
 | 2026-10-02 | Owner ran schema.sql and policies-temporary-open.sql on the new project successfully. Added `supabase/seed-staging.sql`. |
+| 2026-10-02 | Environment switch added (staging vs live), sw.js v69. Found by testing: `clients` had no open policy on the new project (login said Invalid client code); fixed in policies-temporary-open.sql, owner to run one line. |
 | 2026-10-02 | Owner ran seed-staging.sql successfully. Next: staging app config (task 2e). |
 | 2026-10-02 | Real database export received; `supabase/schema.sql` and `policies-temporary-open.sql` written; findings 43-51 added (security is worse than the code review suggested). |
 | 2026-10-02 | Added 4-hour lock rule (tasks 20-24a), schema tasks (2a, 2b), `supabase/` folder with export query and schema skeleton. |

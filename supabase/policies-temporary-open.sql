@@ -27,14 +27,17 @@ alter table public.lop_requests      enable row level security;
 alter table public.audit_log         enable row level security;
 alter table public.enrollment_links  enable row level security;
 alter table public.attendance_freeze enable row level security;
--- RLS is OFF on live for: users, clients, labor_id_sequence (so fully open regardless of policy)
+-- RLS is OFF on live for: users, clients, labor_id_sequence (so fully open regardless of policy).
+-- A new Supabase project may switch RLS on for new tables automatically, so those three also need an open policy here.
+-- (2026-10-02: 'clients' was missing in the first version; owners who already ran this file run only:
+--   create policy "tmp allow all clients" on public.clients for all to anon, authenticated using (true) with check (true);  )
 
 do $$
 declare t text;
 begin
     foreach t in array array['holidays','ot_rates','overtime_records','departments','settings','punch_locations',
                              'laborers','punch_records','daily_attendance','iqama_registry','lop_requests',
-                             'audit_log','enrollment_links','attendance_freeze','users','labor_id_sequence']
+                             'audit_log','enrollment_links','attendance_freeze','users','labor_id_sequence','clients']
     loop
         execute format('create policy %I on public.%I for all to anon, authenticated using (true) with check (true)', 'tmp allow all ' || t, t);
     end loop;

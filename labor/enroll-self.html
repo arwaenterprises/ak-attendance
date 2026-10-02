@@ -343,8 +343,11 @@
 
     <!-- Supabase Config (inline for public page) -->
     <script>
-        const SUPABASE_URL = 'https://kyktwzwiraipwyglkhva.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt5a3R3endpcmFpcHd5Z2xraHZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwMTA2MTcsImV4cCI6MjA4NzU4NjYxN30.acOQWJkfE6Ew9PVyEKNeGxs7ri7QH_AarpPcoT34RBY';
+        const DAWAM_IS_STAGING = ['localhost', '127.0.0.1'].includes(location.hostname) || location.hostname.startsWith('staging.');
+        const SUPABASE_URL = DAWAM_IS_STAGING ? 'https://jbfdaeyqsszoacrijldk.supabase.co' : 'https://kyktwzwiraipwyglkhva.supabase.co';
+        const SUPABASE_ANON_KEY = DAWAM_IS_STAGING
+            ? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmRhZXlxc3N6b2FjcmlqbGRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA5NDg5OTksImV4cCI6MjEwNjUyNDk5OX0.h3Cb8TJfkppvpsmh65Zkb_0W0F3VxJf1O8ISpp7M5UA'
+            : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt5a3R3endpcmFpcHd5Z2xraHZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwMTA2MTcsImV4cCI6MjA4NzU4NjYxN30.acOQWJkfE6Ew9PVyEKNeGxs7ri7QH_AarpPcoT34RBY';
         const { createClient } = supabase;
         const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     </script>
