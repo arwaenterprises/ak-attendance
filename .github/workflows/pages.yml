@@ -3,12 +3,13 @@ name: Publish site
 # Publishes ONLY the app files (see tools/build-site.js) to GitHub Pages.
 # It replaces "publish the whole repository", which also exposed ROADMAP.md, supabase/ and tests/.
 #
-# STEP 1 (now): runs only when started by hand (Actions tab > Publish site > Run workflow).
-# STEP 2 (after the owner switched Settings > Pages > Source to "GitHub Actions" and a manual run worked):
-#        the push trigger below is added so every merge to main publishes automatically.
+# Runs on every merge/push to main (and can also be started by hand: Actions tab > Publish site > Run workflow).
+# If a run fails, the previously published site stays online.
 # The action versions below (configure-pages v5, upload-pages-artifact v3, deploy-pages v4) are from memory:
 # verify them in the GitHub docs if a run reports a problem.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
