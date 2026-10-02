@@ -6,6 +6,11 @@ do $$ begin
 end $$;
 create schema if not exists auth;
 create table if not exists auth.users (id uuid primary key default gen_random_uuid(), email text);
+alter table auth.users add column if not exists encrypted_password text;
+alter table auth.users add column if not exists updated_at timestamptz;
+-- Supabase keeps its extensions (pgcrypto: crypt, gen_salt, gen_random_bytes) in the schema "extensions"
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
 -- like Supabase: reads the user id from the request's JWT claims
 create or replace function auth.uid() returns uuid language sql stable as $$
   select nullif((nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub'), '')::uuid $$;

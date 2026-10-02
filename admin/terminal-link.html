@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dawam Attendance - Punch Terminal Link</title>
+    <link rel="stylesheet" href="../css/main.css">
+    <style>
+        .link-card { max-width: 760px; margin: 0 auto; background: #fff; border-radius: 14px; padding: 24px; box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+        .link-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+        .link-row input { flex: 1; min-width: 220px; padding: 12px; border: 2px solid #cbd5e0; border-radius: 10px; font-size: 14px; font-family: monospace; }
+        .link-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+        #qrBox { display: flex; justify-content: center; margin: 14px 0; } #qrBox svg { width: 240px; height: 240px; }
+        .hint { color: #718096; font-size: 14px; }
+        .danger-zone { border-top: 1px solid #e2e8f0; margin-top: 22px; padding-top: 16px; }
+        .error-box { background: #fff5f5; color: #c53030; border-radius: 10px; padding: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔗 Punch Terminal Link</h1>
+            <div class="header-actions">
+                <button type="button" class="btn btn-secondary" onclick="location.href='../dashboard.html'">← Dashboard</button>
+            </div>
+        </div>
+        <div class="content">
+            <div class="link-card">
+                <div id="loading" class="hint">Loading...</div>
+                <div id="error" class="error-box" style="display:none"></div>
+                <div id="ready" style="display:none">
+                    <p><strong>Send this link to your labors.</strong> They open it once; after that they punch as usual.</p>
+                    <div class="link-row">
+                        <input type="text" id="linkBox" readonly aria-label="Punch terminal link">
+                    </div>
+                    <div class="link-actions">
+                        <button type="button" class="btn btn-primary" id="copyBtn" onclick="copyLink()">📋 Copy link</button>
+                        <button type="button" class="btn btn-success" id="waBtn" onclick="shareWhatsApp()">💬 Share on WhatsApp</button>
+                        <button type="button" class="btn btn-secondary" onclick="openLink()">Open</button>
+                    </div>
+                    <div id="qrBox" aria-label="QR code of the punch terminal link"></div>
+                    <p class="hint" style="text-align:center">Labors can also scan this code with the phone camera.</p>
+                    <div class="danger-zone">
+                        <p class="hint">Lost the link or shared it by mistake? Make a new one. The old link stops working on every phone, so send the new link again.</p>
+                        <button type="button" class="btn btn-danger" id="newBtn" onclick="newLink()">Create a new link</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/config/supabase.js?v=85"></script>
+    <script src="../js/auth/auth.js?v=85"></script>
+    <script src="../js/ui/sync-indicator.js?v=85"></script>
+    <script src="../js/ui/toast.js?v=85"></script>
+    <script src="../js/vendor/qrcode-generator.js?v=85"></script>
+
+    <script>
+        if (!AUTH.requireRole(['admin'])) { /* redirect handled by requireRole */ }
+        let currentLink = '';
+
+        function buildLink(r) { return location.origin + '/punch/index.html?client=' + encodeURIComponent(r.client_code) + '#key=' + r.key; }
+        function showError(msg) {
+            document.getElementById('loading').style.display = 'none'; document.getElementById('ready').style.display = 'none';
+            const e = document.getElementById('error'); e.textContent = msg; e.style.display = 'block';
+        }
+        function showLink(link) {
+            currentLink = link;
+            document.getElementById('linkBox').value = link;
+            const qr = qrcode(0, 'M'); qr.addData(link); qr.make();
+            document.getElementById('qrBox').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+            document.getElementById('loading').style.display = 'none'; document.getElementById('error').style.display = 'none';
+            document.getElementById('ready').style.display = 'block';
+        }
+        async function load(makeNew) {
+            try {
+                SyncIndicator.show(makeNew ? 'Creating a new link...' : 'Loading...');
+                const { data, error } = await supabaseClient.rpc('get_terminal_key', { p_new: !!makeNew });
+                SyncIndicator.hide();
+                if (error) throw error;
+                showLink(buildLink(data));
+                if (makeNew) Toast.success('New link created. Send it to your labors.');
+            } catch (e) {
+                SyncIndicator.hide();
+                showError(e && e.message ? e.message : 'Could not load the link. Check your internet connection.');
+            }
+        }
+        async function copyLink() {
+            try { await navigator.clipboard.writeText(currentLink); }
+            catch (e) { const b = document.getElementById('linkBox'); b.select(); document.execCommand('copy'); }
+            Toast.success('Link copied');
+        }
+        function shareWhatsApp() {
+            window.open('https://wa.me/?text=' + encodeURIComponent('Punch terminal link (open it once, then punch as usual): ' + currentLink), '_blank', 'noopener');
+        }
+        function openLink() { window.open(currentLink, '_blank', 'noopener'); }
+        async function newLink() {
+            if (!confirm('Create a new link?\n\nThe old link stops working on every phone. You will need to send the new link to your labors again.')) return;
+            await load(true);
+        }
+        load(false);
+    </script>
+    <script src="../js/ui/app-update.js?v=85"></script>
+</body>
+</html>
