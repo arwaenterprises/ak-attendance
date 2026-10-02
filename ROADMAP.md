@@ -10,6 +10,18 @@ Rule for every task: do not break the existing workflow or architecture; test be
 
 ---
 
+## NOW - your next steps (kept short on purpose)
+
+| Step | What you do | Done? |
+|------|-------------|-------|
+| 1 | In the NEW Supabase project: SQL Editor > New query > paste `supabase/schema.sql` > Run | No |
+| 2 | Same again with `supabase/policies-temporary-open.sql` | No |
+| 3 | Tell me: "ok" or paste the error message | No |
+
+Only these steps are yours right now. Everything else is mine until I ask.
+
+---
+
 ## A. Decisions made so far
 
 | # | Decision |
