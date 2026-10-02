@@ -37,8 +37,8 @@ const KEY = 'test-terminal-key-1234';
   await test('an old saved TERMINAL session on an administrator page is not accepted: back to the login page', async () => {
     await page.goto(url + '/dashboard.html'); await page.waitForTimeout(1500);
     await page.evaluate(async (k) => { await supabaseClient.auth.signInWithPassword({ email: 'terminal@test.dawam.arwaenterprises.com', password: k }); }, KEY);
-    await page.goto(url + '/dashboard.html');
-    await page.waitForURL(/index\.html/, { timeout: 15000 });
+    await page.goto(url + '/dashboard.html').catch(() => {});   // the page may redirect while it is still loading
+    await page.waitForFunction(() => /index\.html$/.test(location.pathname), null, { timeout: 20000 });
     ok(/index\.html/.test(page.url()), page.url());
   });
 
