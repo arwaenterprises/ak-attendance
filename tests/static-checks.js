@@ -46,6 +46,19 @@ check('every script a page loads is in APP_SHELL (otherwise it is missing offlin
 const pagesNotCached = pages.map(p => '/' + path.relative(ROOT, p).split(path.sep).join('/')).filter(u => !shell.includes(u));
 check('every page is in APP_SHELL', pagesNotCached.length === 0, pagesNotCached.join(', '));
 
+// published site: only app files go online (ROADMAP.md, supabase/, tests/ ... must NOT be public)
+const siteTools = require('../tools/build-site.js');
+const siteOut = fs.mkdtempSync(path.join(require('os').tmpdir(), 'site-'));
+siteTools.build(siteOut);
+const unclassified = siteTools.unclassified();
+check('every top-level file/folder is classified public or private in tools/build-site.js', unclassified.length === 0, 'add to the right list: ' + unclassified.join(', '));
+const leaked = ['ROADMAP.md', 'README.md', 'supabase', 'tests', 'tools', '.github', '.git', 'node_modules'].filter(n => fs.existsSync(path.join(siteOut, n)));
+check('built site does not contain private files (ROADMAP, supabase, tests, tools ...)', leaked.length === 0, leaked.join(', '));
+const notInSite = [...new Set([...shell.filter(u => u !== '/'), ...needed])].filter(u => !fs.existsSync(path.join(siteOut, u.slice(1))));
+check('built site contains every page, script, icon and file the app needs offline', notInSite.length === 0, notInSite.slice(0, 6).join(', '));
+check('built site contains sw.js, manifest.json, index.html', ['sw.js', 'manifest.json', 'index.html'].every(f => fs.existsSync(path.join(siteOut, f))));
+fs.rmSync(siteOut, { recursive: true, force: true });
+
 // manifest
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
 check('manifest has name, short_name, start_url, display standalone', !!(manifest.name && manifest.short_name && manifest.start_url && manifest.display === 'standalone'));

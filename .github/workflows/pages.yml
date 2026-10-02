@@ -1,0 +1,48 @@
+name: Publish site
+
+# Publishes ONLY the app files (see tools/build-site.js) to GitHub Pages.
+# It replaces "publish the whole repository", which also exposed ROADMAP.md, supabase/ and tests/.
+#
+# STEP 1 (now): runs only when started by hand (Actions tab > Publish site > Run workflow).
+# STEP 2 (after the owner switched Settings > Pages > Source to "GitHub Actions" and a manual run worked):
+#        the push trigger below is added so every merge to main publishes automatically.
+# The action versions below (configure-pages v5, upload-pages-artifact v3, deploy-pages v4) are from memory:
+# verify them in the GitHub docs if a run reports a problem.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Static checks
+        run: node tests/static-checks.js
+      - name: Build the public site (app files only)
+        run: node tools/build-site.js _site
+      - name: Make sure nothing private is in the site
+        run: |
+          for f in ROADMAP.md README.md supabase tests tools .github; do
+            if [ -e "_site/$f" ]; then echo "PRIVATE FILE IN SITE: $f"; exit 1; fi
+          done
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
