@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dawam Attendance - Clients</title>
+    <link rel="stylesheet" href="../css/main.css">
+    <style>
+        .hint { color: #718096; font-size: 13px; }
+        .made-box { background: #f0fff4; border: 2px solid #48bb78; border-radius: 12px; padding: 16px; margin: 12px 0; font-family: monospace; white-space: pre-wrap; word-break: break-all; }
+        .row-off { opacity: .55; }
+        .field-row { display: flex; gap: 8px; align-items: flex-end; }
+        .field-row .form-group { flex: 1; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏢 Clients</h1>
+            <div class="header-actions">
+                <button type="button" class="btn btn-secondary" onclick="location.href='../dashboard.html'">← Dashboard</button>
+            </div>
+        </div>
+
+        <div class="action-bar">
+            <div class="action-buttons">
+                <button type="button" class="btn btn-primary" onclick="showAdd()">➕ New client</button>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr><th>Code</th><th>Company</th><th>Status</th><th>Ends</th><th>Laborers</th><th>Last punch</th><th>Administrator</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody id="clientTable"><tr><td colspan="8" class="text-center p-20">Loading...</td></tr></tbody>
+                </table>
+            </div>
+            <p class="hint">You see company names, status and simple counts only. No company's labors, punches or reports are visible here.</p>
+        </div>
+    </div>
+
+    <!-- New client -->
+    <div class="modal-overlay" id="addModal">
+        <div class="modal">
+            <div class="modal-header"><h2>New client</h2><button type="button" class="modal-close" onclick="closeModals()">&times;</button></div>
+            <div class="modal-body">
+                <div id="addForm">
+                    <div class="form-group"><label>Company name *</label><input type="text" id="cName" class="form-control" maxlength="100"></div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Company code * (2-10 letters / digits)</label><input type="text" id="cCode" class="form-control" maxlength="10" style="text-transform:uppercase"></div>
+                        <div class="form-group"><label>Contact person</label><input type="text" id="cOwner" class="form-control" maxlength="100"></div>
+                    </div>
+                    <div class="field-row">
+                        <div class="form-group"><label>Administrator username *</label><input type="text" id="cUser" class="form-control" maxlength="30" placeholder="e.g. admin"></div>
+                        <div class="form-group"><label>Administrator password * (10+ characters)</label><input type="text" id="cPass" class="form-control" maxlength="64"></div>
+                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('cPass').value = genPassword()">Generate</button>
+                    </div>
+                    <div class="form-group"><label>Free trial days</label><input type="number" id="cDays" class="form-control" value="14" min="0" max="3650"></div>
+                </div>
+                <div id="madeBox" style="display:none">
+                    <p><strong>Client created.</strong> Give these details to the client. The password is shown only now.</p>
+                    <div class="made-box" id="madeText"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModals()">Close</button>
+                <button type="button" class="btn btn-secondary" id="copyMade" style="display:none" onclick="copyMade()">📋 Copy details</button>
+                <button type="button" class="btn btn-primary" id="createBtn" onclick="createClient()">Create client</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manage client -->
+    <div class="modal-overlay" id="manageModal">
+        <div class="modal">
+            <div class="modal-header"><h2 id="mTitle">Manage client</h2><button type="button" class="modal-close" onclick="closeModals()">&times;</button></div>
+            <div class="modal-body">
+                <input type="hidden" id="mId">
+                <div class="form-group">
+                    <label>Access</label>
+                    <select id="mActive" class="form-control"><option value="true">Switched on</option><option value="false">Switched off (nobody of this company can sign in or see data)</option></select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Subscription</label>
+                        <select id="mStatus" class="form-control">
+                            <option value="trial">Trial</option><option value="active">Active (paid)</option><option value="premium">Premium (no end date)</option><option value="expired">Expired</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Ends on</label><input type="date" id="mEnd" class="form-control"></div>
+                </div>
+                <div class="form-group"><label>Plan name (tier)</label><input type="text" id="mTier" class="form-control" maxlength="20" placeholder="basic"></div>
+                <div style="text-align:right"><button type="button" class="btn btn-primary" onclick="saveClient()">💾 Save</button></div>
+                <hr style="margin:16px 0">
+                <div class="field-row">
+                    <div class="form-group"><label>New administrator password (10+ characters)</label><input type="text" id="mPass" class="form-control" maxlength="64"></div>
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('mPass').value = genPassword()">Generate</button>
+                    <button type="button" class="btn btn-danger" onclick="resetPassword()">Set password</button>
+                </div>
+                <p class="hint">Tell the administrator the new password. They can then sign in with it.</p>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="closeModals()">Close</button></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/config/supabase.js?v=86"></script>
+    <script src="../js/auth/auth.js?v=86"></script>
+    <script src="../js/utils/date-utils.js?v=86"></script>
+    <script src="../js/ui/sync-indicator.js?v=86"></script>
+    <script src="../js/ui/toast.js?v=86"></script>
+
+    <script>
+        const allowed = AUTH.requireRole(['super_admin']);   // anybody else is sent back to the dashboard and nothing below runs
+
+        let clients = [];
+        const esc = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        function genPassword() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789', a = new Uint32Array(12);
+            crypto.getRandomValues(a); return Array.from(a, x => chars[x % chars.length]).join('');
+        }
+        async function rpc(name, args) {
+            const { data, error } = await supabaseClient.rpc(name, args);
+            if (error) throw new Error(error.message);
+            return data;
+        }
+        function statusBadge(c) {
+            if (!c.is_active) return '<span class="badge badge-inactive">Off</span>';
+            const s = c.subscription_status, expired = c.subscription_end_date && s !== 'premium' && new Date(c.subscription_end_date) < new Date(new Date().toDateString());
+            if (s === 'expired' || expired) return '<span class="badge badge-inactive">Expired</span>';
+            if (s === 'trial') return '<span class="badge badge-warning">Trial</span>';
+            if (s === 'premium') return '<span class="badge badge-info">Premium</span>';
+            return '<span class="badge badge-active">Active</span>';
+        }
+        function render() {
+            const tb = document.getElementById('clientTable');
+            if (!clients.length) { tb.innerHTML = '<tr><td colspan="8" class="text-center p-20 text-muted">No clients yet.</td></tr>'; return; }
+            tb.innerHTML = clients.map(c => `
+                <tr class="${c.is_active ? '' : 'row-off'}">
+                    <td><strong>${esc(c.client_code)}</strong></td>
+                    <td>${esc(c.business_name)}${c.owner_name ? '<br><span class="hint">' + esc(c.owner_name) + '</span>' : ''}</td>
+                    <td>${statusBadge(c)}</td>
+                    <td>${c.subscription_end_date ? esc(DateUtils.formatDate(c.subscription_end_date)) : '-'}</td>
+                    <td>${esc(c.laborers)}</td>
+                    <td>${c.last_punch ? esc(DateUtils.formatDate(c.last_punch)) : '-'}</td>
+                    <td>${esc(c.admin_username || '-')}</td>
+                    <td>${c.is_platform ? '<span class="hint">Platform</span>' : `<button type="button" class="btn btn-sm btn-primary" onclick="showManage('${esc(c.id)}')">Manage</button>`}</td>
+                </tr>`).join('');
+        }
+        async function load() {
+            try {
+                SyncIndicator.show('Loading clients...');
+                clients = await rpc('platform_list_clients', {});
+                SyncIndicator.hide(); render();
+            } catch (e) {
+                SyncIndicator.hide(); Toast.error('Failed to load: ' + e.message);
+                document.getElementById('clientTable').innerHTML = '<tr><td colspan="8" class="text-center p-20 text-danger">Failed to load.</td></tr>';
+            }
+        }
+        function closeModals() { document.getElementById('addModal').classList.remove('active'); document.getElementById('manageModal').classList.remove('active'); }
+
+        // ---------- new client ----------
+        function showAdd() {
+            ['cName', 'cCode', 'cOwner', 'cUser', 'cPass'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('cPass').value = genPassword(); document.getElementById('cDays').value = 14;
+            document.getElementById('addForm').style.display = 'block'; document.getElementById('madeBox').style.display = 'none';
+            document.getElementById('createBtn').style.display = 'inline-block'; document.getElementById('copyMade').style.display = 'none';
+            document.getElementById('addModal').classList.add('active');
+        }
+        async function createClient() {
+            const v = id => document.getElementById(id).value.trim();
+            const name = v('cName'), code = v('cCode').toUpperCase(), user = v('cUser').toLowerCase(), pass = v('cPass');
+            if (!name || !code || !user || !pass) { Toast.error('Please fill company name, code, username and password'); return; }
+            try {
+                SyncIndicator.show('Creating...');
+                const r = await rpc('platform_create_client', { p_name: name, p_code: code, p_admin_username: user, p_admin_password: pass, p_owner_name: v('cOwner') || null, p_trial_days: parseInt(document.getElementById('cDays').value || '14', 10) });
+                SyncIndicator.hide();
+                document.getElementById('madeText').textContent =
+                    `Company: ${name}\nWeb address: ${location.origin}\nCompany code: ${r.client_code}\nUsername: ${r.admin_username}\nPassword: ${pass}\nTrial ends: ${r.trial_ends}\n\nAfter signing in, open "Terminal Link" on the dashboard to get the punch link for the labors.`;
+                document.getElementById('addForm').style.display = 'none'; document.getElementById('madeBox').style.display = 'block';
+                document.getElementById('createBtn').style.display = 'none'; document.getElementById('copyMade').style.display = 'inline-block';
+                Toast.success('Client created'); load();
+            } catch (e) { SyncIndicator.hide(); Toast.error(e.message); }
+        }
+        async function copyMade() {
+            const t = document.getElementById('madeText').textContent;
+            try { await navigator.clipboard.writeText(t); Toast.success('Copied'); } catch (e) { Toast.error('Could not copy. Select the text and copy it.'); }
+        }
+
+        // ---------- manage ----------
+        function showManage(id) {
+            const c = clients.find(x => x.id === id); if (!c) return;
+            document.getElementById('mTitle').textContent = c.business_name + ' (' + c.client_code + ')';
+            document.getElementById('mId').value = c.id;
+            document.getElementById('mActive').value = String(!!c.is_active);
+            document.getElementById('mStatus').value = c.subscription_status || 'trial';
+            document.getElementById('mEnd').value = c.subscription_end_date || '';
+            document.getElementById('mTier').value = c.subscription_tier || '';
+            document.getElementById('mPass').value = '';
+            document.getElementById('manageModal').classList.add('active');
+        }
+        async function saveClient() {
+            const id = document.getElementById('mId').value, status = document.getElementById('mStatus').value, end = document.getElementById('mEnd').value;
+            try {
+                SyncIndicator.show('Saving...');
+                await rpc('platform_set_client', { p_client: id, p_is_active: document.getElementById('mActive').value === 'true', p_status: status, p_end_date: status === 'premium' ? null : (end || null), p_tier: document.getElementById('mTier').value.trim() || null });
+                SyncIndicator.hide(); Toast.success('Saved'); closeModals(); load();
+            } catch (e) { SyncIndicator.hide(); Toast.error(e.message); }
+        }
+        async function resetPassword() {
+            const id = document.getElementById('mId').value, pass = document.getElementById('mPass').value.trim();
+            if (pass.length < 10) { Toast.error('The password needs at least 10 characters'); return; }
+            if (!confirm('Set this as the administrator password of this company?')) return;
+            try {
+                SyncIndicator.show('Saving...');
+                await rpc('platform_reset_admin_password', { p_client: id, p_password: pass });
+                SyncIndicator.hide(); Toast.success('Password set. Tell the administrator.');
+            } catch (e) { SyncIndicator.hide(); Toast.error(e.message); }
+        }
+        if (allowed) load();
+    </script>
+    <script src="../js/ui/app-update.js?v=86"></script>
+</body>
+</html>
