@@ -12,13 +12,13 @@ Rule for every task: do not break the existing workflow or architecture; test be
 
 ## PROGRESS (updated after every finished task)
 
-**Overall: about 52% complete** (my estimate: the weights are judgement, not measurement)
+**Overall: about 54% complete** (my estimate: the weights are judgement, not measurement)
 
 | Area (what you asked for) | Weight | Done | Status |
 |---|---|---|---|
 | App update popup, PWA install, offline, new update icon, rename to Dawam | 15% | 100% | Live |
-| Security: database closed, new login, terminal, private photos (S1-S4 done, **S5 live cutover left**) | 30% | 90% | Built and verified on staging; live cutover rehearsed locally, waiting for your OK |
-| One admin per client, Users page removed, many devices | 5% | 70% | Works on staging; goes live with S5 |
+| Security: database closed, new login, terminal, private photos, live cutover (S1-S5) | 30% | 97% | **LIVE** since 2026-10-02 (v77). Left: remove old login code after a stable period, delete the archived other-app tables when you decide |
+| One admin per client, Users page removed, many devices | 5% | 100% | Live |
 | IN / OUT punches, 4-hour lock, repeated / mismatched punch checks | 10% | 0% | Needs S5 first (it runs in the new terminal path) |
 | Shift management: Day / Night, assign labors, reports follow the shift | 20% | 0% | Not started |
 | Client (SaaS) management: platform-owner page | 10% | 0% | Not started |
@@ -31,18 +31,9 @@ Why S5 comes before IN/OUT and the lock: those rules live in the new terminal pa
 
 ---
 
-## NOW - S5 live cutover: waiting for your OK
+## NOW - next: IN / OUT punches and the 4-hour lock
 
-You decided: **same live project**, other apps removed (kept hidden, not deleted), supervisors removed. Everything is built and rehearsed on a local copy that imitates live (all checks pass, including the way back).
-
-Files: [plan](https://github.com/arwaenterprises/ak-attendance/blob/claude/cool-cannon-o7cbyn/supabase/CUTOVER_PLAN.md) | [cutover SQL](https://github.com/arwaenterprises/ak-attendance/blob/claude/cool-cannon-o7cbyn/supabase/live/live-cutover-bundle.sql) | [rollback SQL](https://github.com/arwaenterprises/ak-attendance/blob/claude/cool-cannon-o7cbyn/supabase/live/live-rollback-bundle.sql) | [rehearsal test](https://github.com/arwaenterprises/ak-attendance/blob/claude/cool-cannon-o7cbyn/tests/db/live-like.test.sql)
-
-| # | I need from you | Answer |
-|---|----------|--------|
-| 1 | Admin username for AE1 | **Answered:** `akhtaransari` (existing admin renamed) |
-| 2 | Number of punch terminals for AE1 | **Answered:** 1 main (Kaden Warehouse); Sulay to confirm |
-| 3 | A quiet window | **Answered:** 60-90 min fine; need the day/time |
-| 4 | Explicit OK on the plan | |
+S5 is done and live. Needed from the owner before building: the exact rule for punches after the lock (see section E, question 24a).
 
 ---
 
@@ -230,6 +221,8 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 
 | Date | Change |
 |------|--------|
+| 2026-10-02 | New punch terminal look drafted (v78, branch only, NOT live): face + ID box (phone keyboard) + IN / OUT buttons, green IN / red bye-bye OUT / amber already-logged-in screens, 7-second auto close, hides the 4-hour rule from labors. 8 new end-to-end tests (`tests/punch-ui.test.js`) pass on staging; smoke 15, update 24, environment 5 pass. Design: https://claude.ai/artifact/S732jY4pMiZUcd84dPvLFW. Decided: ID typed each time (option C); monthly view = current + previous month. Supabase usage (live, 2026-10-02): storage 0.21 of 1 GB, database 48 MB of 500 MB, egress 0.54 GB of 5 GB. |
+| 2026-10-02 | **S5 LIVE CUTOVER DONE.** Live database locked down (other apps archived, AE2/AE3 and extra locations removed, supervisors inactive), new login live for every host (v77), terminal working with the new terminal key. Owner confirmed admin login, reports and punching. Progress about 54%. |
 | 2026-10-02 | S5 window started. Auth accounts created by owner. App switch to the new login for all hosts prepared as version 77 (NOT merged until the database step is done); static, environment, update tests pass. |
 | 2026-10-02 | Owner approved clean-up: `supabase/live/000b_cleanup_live.sql` (delete AE2/AE3, keep punch locations Kaden Warehouse + Sulay, delete retired supervisors, expired enrolment links). In the cutover bundle; rehearsal covers it (all pass). Rollback does not undo it. |
 | 2026-10-02 | S5 artifacts built: `supabase/live/000_prepare_live.sql`, generated cutover and rollback bundles (`tools/build-live-bundle.js`, kept current by static checks), rehearsal on a live-like database (other apps archived, old rules gone, supervisors retired, rollback restores everything). Plan rewritten for in-place cutover. Waiting for owner OK. |
