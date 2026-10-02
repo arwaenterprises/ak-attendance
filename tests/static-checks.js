@@ -97,6 +97,17 @@ check('supabase/live/live-cutover-bundle.sql is up to date (run: node tools/buil
   fs.existsSync(path.join(ROOT, 'supabase/live/live-cutover-bundle.sql')) && fs.readFileSync(path.join(ROOT, 'supabase/live/live-cutover-bundle.sql'), 'utf8') === liveB.cutover());
 check('supabase/live/live-rollback-bundle.sql is up to date (run: node tools/build-live-bundle.js)',
   fs.existsSync(path.join(ROOT, 'supabase/live/live-rollback-bundle.sql')) && fs.readFileSync(path.join(ROOT, 'supabase/live/live-rollback-bundle.sql'), 'utf8') === liveB.rollback());
+// the login-mode switch must exist ONLY in js/config/supabase.js and say 'supabase' (a page with its own copy that said 'legacy' broke self-enrollment on the live site)
+const modeCopies = [];
+(function scan(dir) {
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (['node_modules', '.git', 'tests', 'supabase', '_site', 'tools'].includes(e.name)) continue;
+    const f = path.join(dir, e.name);
+    if (e.isDirectory()) scan(f);
+    else if (/\.(html|js)$/.test(e.name) && /DAWAM_AUTH_MODE\s*=\s*[^;\n]*['"]legacy['"]/.test(fs.readFileSync(f, 'utf8'))) modeCopies.push(path.relative(ROOT, f));
+  }
+})(ROOT);
+check("no page sets the login mode to 'legacy' (the old login is gone)", modeCopies.length === 0, modeCopies.join(', '));
 check('every host uses the new login (DAWAM_AUTH_MODE is supabase after the S5 cutover)', /DAWAM_AUTH_MODE\s*=\s*'supabase'/.test(supaJs));
 
 // version must be bumped when app files changed (CI sets BASE_SHA)
