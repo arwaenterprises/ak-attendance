@@ -10,12 +10,13 @@ Rule for every task: do not break the existing workflow or architecture; test be
 
 ---
 
-## NOW - your next step (one at a time)
+## NOW - your next steps (one at a time)
 
 | Step | What you do | Done? |
 |------|-------------|-------|
-| 15 | **STAGING project only.** (a) Supabase > Authentication > Users > Add user > Create new user: email `admin@test.dawam.arwaenterprises.com`, password `Test@1234`, tick "Auto Confirm User". (b) SQL Editor > New query > paste the WHOLE file `supabase/staging-security-bundle.sql` > Run. It should show `admin@test.dawam.arwaenterprises.com`. Then reply "done" | No |
-| 16 | (after 15) Authentication settings: turn OFF "Allow new users to sign up" (I will tell you where) | No |
+| 15 | Staging: Auth user + `staging-security-bundle.sql` | Yes (verified: 12 login/lock-out checks, 16 baseline, 24 update tests pass on staging) |
+| 16 | **STAGING project:** SQL Editor > New query > paste the whole file `supabase/migrations/003_lop_labor_fk.sql` > Run. (Fixes the LOP lists; see finding 58.) Reply "done" | No |
+| 17 | (after 16) Authentication settings: turn OFF "Allow new users to sign up" | No |
 
 Parked, not forgotten: licence of the update icon picture (step 11).
 
@@ -119,7 +120,7 @@ Design (decided by me, to confirm at step 2): users log in with **Supabase Auth*
 | # | Step | Severity | Status |
 |---|------|----------|--------|
 | S1 | Database rules: each client sees and changes only its own rows; public key gets nothing; password hashes unreadable; clients cannot edit subscriptions; audit log append-only; functions check the caller. File `supabase/migrations/001_security_foundation.sql`. **118 checks pass on a local Postgres 16** (`bash tests/db/run.sh`, also in CI); a deliberately loosened rule makes them fail. NOT applied to any Supabase project yet (it would stop the current app) | Critical | Done (tested locally) |
-| S2 | App login with Supabase Auth on staging; single admin per client; Users page removed; app pages work under the new rules; baseline tests moved to a logged-in test user. **Built:** migration 002 (one active admin per company, usernames/settings per company, subscription/expiry enforced by the database, `link_admin_profile` for the platform owner), `loginSupabase` in auth.js (one general error message, this-device-only logout, session check on every page), Users tile/page gone with the new login, tests: 21 database checks + dry run of the exact staging procedure, 5 environment checks, 12 end-to-end login/lock-out checks (`tests/auth.test.js`). The new login is **staging-only** (`DAWAM_AUTH_MODE`); the live site keeps the old login until S5. **Waiting for:** owner applies the staging bundle (step 15), then I run the browser tests and fix what they find | Critical | In progress |
+| S2 | App login with Supabase Auth on staging; single admin per client; Users page removed; app pages work under the new rules; baseline tests moved to a logged-in test user. **Built:** migration 002 (one active admin per company, usernames/settings per company, subscription/expiry enforced by the database, `link_admin_profile` for the platform owner), `loginSupabase` in auth.js (one general error message, this-device-only logout, session check on every page), Users tile/page gone with the new login, tests: 21 database checks + dry run of the exact staging procedure, 5 environment checks, 12 end-to-end login/lock-out checks (`tests/auth.test.js`). The new login is **staging-only** (`DAWAM_AUTH_MODE`); the live site keeps the old login until S5. **Verified on staging 2026-10-02:** login, lock-out of the public key, two devices, session checks (12 checks), 16 baseline + 24 update tests. Page tests found finding 58 (pre-existing on live). Remaining for S2: LOP fix on staging, sign-ups off, page tests green | Critical | In progress |
 | S3 | Punch terminal: per-client terminal key + narrow functions (face data, settings, punch save, sync) so the terminal works without an open database | Critical | Todo |
 | S4 | Punch photos private (signed links); labor self-enrollment page through a safe function; storage rules | High | Todo |
 | S5 | Login attempt limits, audit review, remove the temporary open policies, **live cutover plan** (migrate the live admin accounts, switch the live project) with a rollback | Critical | Todo |
@@ -171,6 +172,8 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 | 56 | **(FIXED 2026-10-02: Pages now publishes only app files; ROADMAP.md, README.md, supabase/, tests/ return 404 on the live domain. They remain in git history and in the GitHub repository itself: treat the repository as private-grade content, and check its visibility)** **GitHub Pages publishes the whole repository on your live domain.** Confirmed reachable today: `/ROADMAP.md` (this file, with the security findings), `/supabase/schema.sql`, `/supabase/seed-staging.sql` (staging test login in a comment), `/tests/harness.html`. Anyone can read the database structure and the list of weaknesses. The anon key is public anyway, but a roadmap of open holes should not be. Fix: publish only the app files with a small GitHub Actions workflow (and switch Settings > Pages > Source to "GitHub Actions"). Until then, treat everything in this repository as public. Also answers the earlier question whether the repo is public: Pages exposure is the same either way | High | Done |
 
 | 57 | **Devices that still run the OLD app (before version 72) cannot be told to update.** The old app has no update code, and its old cache-first service worker keeps serving the old pages until the browser itself notices the new `sw.js` (browsers check on opening, at most about once a day; verify). Simulated in a real browser: once noticed, the new service worker takes over within seconds and the next open shows the new UI. From version 72 on, devices check themselves (red dot + popup). Manual remedy if urgent: clear the site's data, BUT only after confirming no offline punches are waiting to sync, and then reopen the punch terminal with its `?client=CODE` address (the installed app's start address has no client code) | Medium | Known, documented |
+
+| 58 | **LOP lists cannot load - on the LIVE site too.** `attendance/lop.html` (pending / approved / rejected / draft lists) asks for `laborers:labor_id(...)` but the database has no foreign key `lop_requests.labor_id -> laborers.labor_id`, so it answers 400 "Could not find a relationship". Found by the new page tests; **confirmed on live with one read-only request that returns no rows**. Fix: `supabase/migrations/003_lop_labor_fk.sql` (adds the key as NOT VALID so old data cannot block it). Staging first; for live it needs your OK and one paste (also check the page after) | High | Fix written and tested locally; staging next; live needs your OK |
 
 ---
 
