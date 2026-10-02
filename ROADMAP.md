@@ -15,8 +15,8 @@ Rule for every task: do not break the existing workflow or architecture; test be
 | Step | What you do | Done? |
 |------|-------------|-------|
 | 9 | Answer one question: may I set up publishing so only the app files are public (finding 56)? It needs ONE setting change by you in GitHub (Settings > Pages > Source > "GitHub Actions") | No |
-| 10 | Say "live" and I merge the new update icon + centred install card (version 73) to the live site | No |
-| 11 | Check you have the right to use the update icon picture (it looks like a stock icon; free icon sites usually require credit). I do not have a verified source for its licence | No |
+| 10 | Update icon + centred install card are LIVE (version 73, 2026-10-02 16:33 UTC). On your PWA: close the app fully and open it twice; if it still looks old tell me the device type (see finding 57) | No |
+| 11 | Check you have the right to use the update icon picture (looks like a stock icon; free icon sites usually require credit; I have no verified source for its licence) | No |
 
 Everything else is mine until I ask.
 
@@ -158,6 +158,8 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 
 | 56 | **GitHub Pages publishes the whole repository on your live domain.** Confirmed reachable today: `/ROADMAP.md` (this file, with the security findings), `/supabase/schema.sql`, `/supabase/seed-staging.sql` (staging test login in a comment), `/tests/harness.html`. Anyone can read the database structure and the list of weaknesses. The anon key is public anyway, but a roadmap of open holes should not be. Fix: publish only the app files with a small GitHub Actions workflow (and switch Settings > Pages > Source to "GitHub Actions"). Until then, treat everything in this repository as public. Also answers the earlier question whether the repo is public: Pages exposure is the same either way | High | Needs your answer (step 9) |
 
+| 57 | **Devices that still run the OLD app (before version 72) cannot be told to update.** The old app has no update code, and its old cache-first service worker keeps serving the old pages until the browser itself notices the new `sw.js` (browsers check on opening, at most about once a day; verify). Simulated in a real browser: once noticed, the new service worker takes over within seconds and the next open shows the new UI. From version 72 on, devices check themselves (red dot + popup). Manual remedy if urgent: clear the site's data, BUT only after confirming no offline punches are waiting to sync, and then reopen the punch terminal with its `?client=CODE` address (the installed app's start address has no client code) | Medium | Known, documented |
+
 ---
 
 ## D. Feedback and suggestions
@@ -186,7 +188,7 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 |------|--------|
 | 2026-10-02 | Roadmap created from the code review. No application code changed yet. |
 | 2026-10-02 | Owner ran schema.sql and policies-temporary-open.sql on the new project successfully. Added `supabase/seed-staging.sql`. |
-| 2026-10-02 | Owner's own update icon (`icons/ui-update.png`) now used everywhere; on the punch terminal it sits next to "View My Attendance". Install prompt is now a centred card shown at start (Install / Not now; iPhone shows Add to Home Screen steps). Version 73. 24 update tests + 15 smoke tests pass. Not yet merged to live. |
+| 2026-10-02 | Owner's own update icon (`icons/ui-update.png`) now used everywhere; on the punch terminal it sits next to "View My Attendance". Install prompt is now a centred card shown at start (Install / Not now; iPhone shows Add to Home Screen steps). Version 73. 24 update tests + 15 smoke tests pass. **Merged to live (PR 10, version 73, 16:33 UTC).** Old-device upgrade simulated: works once the browser detects the new service worker (finding 57). |
 | 2026-10-02 | **Merged to main and LIVE (PR 9, version 72).** Verified on the live domain: sw.js v72, new login page, manifest, icons, punch page respond. Live host uses the live database (host test). Found: the whole repo is publicly served (finding 56). |
 | 2026-10-02 | Rename to Dawam Attendance (task 12), version 72, static check against leftover AK names; README default login removed (finding 55). All suites pass: static, 16 baseline, 22 update, 15 smoke. |
 | 2026-10-02 | Update mechanism built: new service worker, `app-update.js`, `pwa-install.js`, icons, manifest, `tools/bump-version.js`, static checks, 22 update tests, 15 page smoke tests. Everything passes locally: static checks, 16 baseline, 22 update, 15 smoke. Version now 71. |
