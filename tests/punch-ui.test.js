@@ -105,6 +105,11 @@ const JPEG_B64 = require('fs').readFileSync(__dirname + '/photos.test.js', 'utf8
     const o = await ov(); ok(/Punched OUT/.test(o.title) && /Bye bye/.test(o.details), JSON.stringify(o));
     eq((await adminRows()).map(r => r.type).sort(), ['login', 'logout']); await waitClosed();
   });
+  await test('IN after the OUT the same day is refused: "You have already logged out for the day"; nothing new is stored', async () => {
+    await press('#inBtn', LABOR); await waitResult('k-warn');
+    const o = await ov(); ok(/already logged out for the day/i.test(o.title), JSON.stringify(o));
+    eq((await adminRows()).length, 2); await waitClosed();
+  });
   await test('an unknown ID shows a message under the ID box and starts nothing', async () => {
     await press('#inBtn', 'NOPE999');
     await page.waitForFunction(() => document.getElementById('idError').style.display === 'block');
