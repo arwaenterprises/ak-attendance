@@ -14,8 +14,8 @@ Rule for every task: do not break the existing workflow or architecture; test be
 
 | Step | What you do | Done? |
 |------|-------------|-------|
-| 1-5 | NEW Supabase project fully set up (structure, policies, test data, clients policy) | Yes |
-| 6 | Reply "go" (done). Baseline tests are finished; I am now building the update mechanism + PWA + rename (tasks 4-12). Nothing needed from you yet | Yes |
+| 1-6 | Staging project set up, tests written, update mechanism built | Yes |
+| 7 | Nothing yet. I am doing the rename to "Dawam Attendance" (task 12) next, then I will ask you one question before touching the live site | - |
 
 Only these steps are yours right now. Everything else is mine until I ask.
 
@@ -50,18 +50,18 @@ Only these steps are yours right now. Everything else is mine until I ask.
 | 2e | Staging config: app uses the new project ONLY on localhost / 127.0.0.1 / `staging.*` hosts; every other address (live site included) uses the live project; red STAGING badge; `sw.js` v69. **Tested:** login TEST / admin / Test@1234 on a local copy reaches the dashboard against the new project, contacting only the new project | High | Done |
 | 2f | Decide where a shared staging page lives (e.g. a `staging.` address) so you can try it on a phone. Not needed yet; I test locally first | Low | Todo |
 | 2b | Keep `supabase/schema.sql` updated with every database change from now on (see D8) | Medium | Todo |
-| 3 | CI (GitHub Actions): `.github/workflows/tests.yml` runs the baseline tests on every push. Static checks (version numbers, SW file list) still to add. Workflow not yet run on GitHub | Medium | In progress |
+| 3 | CI (GitHub Actions): `.github/workflows/tests.yml` runs static checks + baseline + update + smoke tests on every push. **Not yet run on GitHub** | Medium | In progress |
 
 ### 2. App update, service worker, PWA
 
 | # | Task | Severity | Status |
 |---|------|----------|--------|
-| 4 | Service worker becomes network-first (today it is cache-first, so devices can run old code for days) | High | Todo |
-| 5 | One version number: `?v=N` on every script tag AND in `sw.js`; static check fails the build if they differ or are not bumped | High | Todo |
-| 6 | Update icon + red dot + centred popup ("Update now" / "Later"); never reloads by itself | High | Todo |
-| 7 | Register the service worker on every page, not only the punch page; pre-cache all app files | Medium | Todo |
-| 8 | Install prompt on the punch terminal (browser prompt where supported; "Add to Home Screen" hint on iPhone) | Medium | Todo |
-| 9 | Real PNG app icons (current icon is an inline SVG that some phones may reject; verify on a real device) | Medium | Needs your answer (logo?) |
+| 4 | Service worker rewritten: network-first for own files (cache only when offline), cache-first for third-party libraries/face models, never caches the version check, deletes old caches, one missing file no longer cancels the pre-cache. **Tested** (incl. a deliberate break to prove the test catches cache-first) | High | Done |
+| 5 | One version number (`?v=N` on all 108 script tags + `CACHE_VERSION` in sw.js, now 71). Change it only with `node tools/bump-version.js [N]`. `tests/static-checks.js` fails if they differ, a script is missing from the offline list, or the version was not bumped when app files changed (CI). **Proven by deliberately breaking each rule** | High | Done |
+| 6 | Update icon + red dot + centred popup (`js/ui/app-update.js`, every page): checks 4 s after opening, when the app comes back to the foreground after 5+ min, and 2 s after the connection returns; never while offline; never pops up over another window or while a punch is in progress; "Update now" clears service workers and caches but keeps saved data. 22 tests pass. Decision: NO automatic reload on service-worker change (a reload could cut a punch in half) | High | Done |
+| 7 | Service worker registered on every page by `app-update.js`; all 15 pages and all scripts pre-cached (static check enforces it). Tested: pages open offline | Medium | Done |
+| 8 | Install prompt on the punch terminal (`js/ui/pwa-install.js`): Install button when the browser offers it, Add-to-Home-Screen hint on iPhone. Tested with a simulated browser event. **Not tested on a real phone** | Medium | Done (verify on real devices) |
+| 9 | Real PNG app icons: 192, 512 and maskable 512 in `/icons` and the manifest (name "Dawam Attendance"). **Placeholder** design (white D on purple); replace with your logo when you have one. Verify installing on a real phone | Medium | Done (placeholder icon; logo needed) |
 | 10 | Fix offline-sync registration code in `js/utils/sync-manager.js` (~line 413 uses `window.registration` / `navigator.serviceWorker.sync`, which I believe are not valid; verify in current docs) and the `online` listener inside `sw.js` (a service worker likely never receives it) | Medium | Todo |
 | 11 | GitHub Pages cannot set `no-cache` headers (it serves files with a short cache, I believe about 10 minutes; verify). Updates may appear up to that long after deploy. Test on a real device | Low | Todo |
 
@@ -181,6 +181,7 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 |------|--------|
 | 2026-10-02 | Roadmap created from the code review. No application code changed yet. |
 | 2026-10-02 | Owner ran schema.sql and policies-temporary-open.sql on the new project successfully. Added `supabase/seed-staging.sql`. |
+| 2026-10-02 | Update mechanism built: new service worker, `app-update.js`, `pwa-install.js`, icons, manifest, `tools/bump-version.js`, static checks, 22 update tests, 15 page smoke tests. Everything passes locally: static checks, 16 baseline, 22 update, 15 smoke. Version now 71. |
 | 2026-10-02 | Baseline tests written (16 pass on staging). They found 2 new bugs: findings 52, 53. CI workflow added, not yet run on GitHub. |
 | 2026-10-02 | Owner applied the clients policy; staging login test passes (dashboard reached on new project). Task 2e done. |
 | 2026-10-02 | Environment switch added (staging vs live), sw.js v69. Found by testing: `clients` had no open policy on the new project (login said Invalid client code); fixed in policies-temporary-open.sql, owner to run one line. |

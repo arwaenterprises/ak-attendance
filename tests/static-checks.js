@@ -1,0 +1,74 @@
+// Static checks (no browser, no network). Run:  node tests/static-checks.js
+// In CI, BASE_SHA is set so the "version bumped" rule can compare with the previous commit.
+const fs = require('fs'), path = require('path'), { execSync } = require('child_process');
+const ROOT = path.resolve(__dirname, '..');
+let failed = 0;
+const check = (name, cond, detail) => { console.log(`${cond ? '  PASS' : '  FAIL'}  ${name}${!cond && detail ? '\n        ' + detail : ''}`); if (!cond) failed++; };
+
+const SKIP = new Set(['.git', 'node_modules', 'tests', 'tools', 'supabase', 'templates', 'icons', 'js', 'css']);
+const pages = [];
+(function walk(dir) { for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+  if (e.name.startsWith('.') || SKIP.has(e.name) && dir === ROOT) continue;
+  const p = path.join(dir, e.name);
+  if (e.isDirectory()) { if (!SKIP.has(e.name)) walk(p); } else if (p.endsWith('.html')) pages.push(p);
+} })(ROOT);
+
+const sw = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
+const swVersion = Number((sw.match(/CACHE_VERSION\s*=\s*'dawam-attendance-v(\d+)'/) || [])[1]);
+check('sw.js has the line  const CACHE_VERSION = \'dawam-attendance-vN\';  (the in-app check reads it)', swVersion > 0);
+
+const tags = [];   // { page, src, v }
+for (const p of pages) {
+  const html = fs.readFileSync(p, 'utf8');
+  for (const m of html.matchAll(/<script\s+src="(?!https?:)([^"?]+)(\?v=(\d+))?"/g))
+    tags.push({ page: path.relative(ROOT, p), src: m[1], v: m[3] ? Number(m[3]) : null, abs: path.resolve(path.dirname(p), m[1]) });
+}
+check(`found ${pages.length} pages and ${tags.length} local script tags`, pages.length >= 10 && tags.length >= 50);
+const noVersion = tags.filter(t => t.v === null);
+check('every local script tag has ?v=N', noVersion.length === 0, noVersion.slice(0, 5).map(t => `${t.page}: ${t.src}`).join('\n        '));
+const versions = [...new Set(tags.map(t => t.v))];
+check('all script tags use the same ?v= number', versions.length === 1, 'found: ' + versions.join(', '));
+check('sw.js CACHE_VERSION number equals the ?v= number (run: node tools/bump-version.js N)', versions.length === 1 && versions[0] === swVersion, `sw=${swVersion} tags=${versions.join(',')}`);
+const missing = tags.filter(t => !fs.existsSync(t.abs));
+check('every script file exists', missing.length === 0, missing.slice(0, 5).map(t => `${t.page}: ${t.src}`).join('\n        '));
+const noUpdate = pages.filter(p => !/js\/ui\/app-update\.js\?v=\d+/.test(fs.readFileSync(p, 'utf8'))).map(p => path.relative(ROOT, p));
+check('every page loads js/ui/app-update.js', noUpdate.length === 0, noUpdate.join(', '));
+
+// service worker pre-cache list
+const shellBlock = (sw.match(/const APP_SHELL = \[([\s\S]*?)\];/) || [])[1] || '';
+const shell = [...shellBlock.matchAll(/'(\/[^']*)'/g)].map(m => m[1]);
+check('APP_SHELL parsed', shell.length > 20);
+const shellMissing = shell.filter(u => u !== '/' && !fs.existsSync(path.join(ROOT, u.slice(1))));
+check('every file listed in APP_SHELL exists', shellMissing.length === 0, shellMissing.join(', '));
+const needed = [...new Set(tags.map(t => '/' + path.relative(ROOT, t.abs).split(path.sep).join('/')))];
+const notCached = needed.filter(u => !shell.includes(u));
+check('every script a page loads is in APP_SHELL (otherwise it is missing offline)', notCached.length === 0, notCached.join(', '));
+const pagesNotCached = pages.map(p => '/' + path.relative(ROOT, p).split(path.sep).join('/')).filter(u => !shell.includes(u));
+check('every page is in APP_SHELL', pagesNotCached.length === 0, pagesNotCached.join(', '));
+
+// manifest
+const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
+check('manifest has name, short_name, start_url, display standalone', !!(manifest.name && manifest.short_name && manifest.start_url && manifest.display === 'standalone'));
+const sizes = (manifest.icons || []).map(i => i.sizes);
+check('manifest has PNG icons 192x192 and 512x512', sizes.includes('192x192') && sizes.includes('512x512') && manifest.icons.every(i => i.type === 'image/png'));
+const iconsMissing = (manifest.icons || []).filter(i => !fs.existsSync(path.join(ROOT, i.src.slice(1))));
+check('every manifest icon file exists', iconsMissing.length === 0, iconsMissing.map(i => i.src).join(', '));
+
+// version must be bumped when app files changed (CI sets BASE_SHA)
+const base = process.env.BASE_SHA;
+if (base && !/^0+$/.test(base)) {
+  try {
+    const changed = execSync(`git diff --name-only ${base} HEAD`, { cwd: ROOT }).toString().split('\n')
+      .filter(f => f && f !== 'sw.js' && /^(.*\.html|js\/.*|css\/.*|icons\/.*|manifest\.json)$/.test(f));
+    const baseSw = execSync(`git show ${base}:sw.js`, { cwd: ROOT }).toString();
+    const baseVersion = (baseSw.match(/CACHE_VERSION\s*=\s*'([^']+)'/) || [])[1];
+    const nowVersion = (sw.match(/CACHE_VERSION\s*=\s*'([^']+)'/) || [])[1];
+    check('version bumped when app files changed', changed.length === 0 || baseVersion !== nowVersion,
+      `${changed.length} app file(s) changed (e.g. ${changed[0]}) but CACHE_VERSION is still ${nowVersion}. Run: node tools/bump-version.js`);
+  } catch (e) { console.log('  NOTE  could not compare with ' + base + ' (' + String(e.message).split('\n')[0] + ')'); }
+} else {
+  console.log('  NOTE  BASE_SHA not set - skipping the "version bumped" check');
+}
+
+console.log(failed ? `\n${failed} check(s) FAILED` : '\nAll static checks passed');
+process.exit(failed ? 1 : 0);

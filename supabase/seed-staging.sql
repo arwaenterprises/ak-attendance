@@ -5,8 +5,9 @@
 -- (staging password, change it; hash = sha256("admin:Test@1234") exactly as js/auth/auth.js computes it)
 -- Setting values below are test values I chose, not copied from your live data.
 -- ============================================================
-insert into public.clients (id, business_name, client_code, subscription_status, subscription_tier, is_active)
-values ('00000000-0000-0000-0000-000000000001', 'Test Company', 'TEST', 'premium', 'basic', true)
+-- subscribed_apps must contain 'attendance' or the punch terminal says "Attendance app not subscribed"
+insert into public.clients (id, business_name, client_code, subscription_status, subscription_tier, is_active, subscribed_apps)
+values ('00000000-0000-0000-0000-000000000001', 'Test Company', 'TEST', 'premium', 'basic', true, array['attendance'])
 on conflict (id) do nothing;
 
 insert into public.users (username, password_hash, name, role, status, client_id)

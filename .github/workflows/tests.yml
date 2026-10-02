@@ -1,24 +1,34 @@
 name: Tests
 
-# Runs the baseline tests (tests/) against the STAGING Supabase project on every push and pull request.
-# Not yet run on GitHub: first run may need small fixes.
+# Static checks + browser tests on every push and pull request.
+# Browser tests run against the STAGING Supabase project (never the live one).
+# Not yet run on GitHub: the first run may need small fixes.
 on:
   push:
   pull_request:
 
 jobs:
-  baseline:
+  tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # needed so the static check can compare with the previous commit
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Install test tools
+      - name: Static checks (version numbers, pre-cache list, manifest, version bump)
+        run: node tests/static-checks.js
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+      - name: Install browser test tools
         working-directory: tests
         run: |
           npm install
           npx playwright install --with-deps chromium
-      - name: Baseline tests
+      - name: Browser tests
         working-directory: tests
-        run: npm test
+        run: |
+          node baseline.test.js
+          node update.test.js
+          node smoke.test.js

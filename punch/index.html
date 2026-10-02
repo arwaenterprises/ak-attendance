@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AK Punch Terminal</title>
     <link rel="manifest" href="../manifest.json">
+    <link rel="apple-touch-icon" href="../icons/icon-192.png">
     <meta name="theme-color" content="#667eea">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -529,13 +530,13 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="../js/config/supabase.js"></script>
-    <script src="../js/utils/date-utils.js"></script>
-    <script src="../js/utils/photo-utils.js"></script>
-    <script src="../js/utils/offline-storage.js"></script>
-    <script src="../js/utils/sync-manager.js"></script>
-    <script src="../js/api/labor-api.js"></script>
-    <script src="../js/api/punch-api.js"></script>
+    <script src="../js/config/supabase.js?v=71"></script>
+    <script src="../js/utils/date-utils.js?v=71"></script>
+    <script src="../js/utils/photo-utils.js?v=71"></script>
+    <script src="../js/utils/offline-storage.js?v=71"></script>
+    <script src="../js/utils/sync-manager.js?v=71"></script>
+    <script src="../js/api/labor-api.js?v=71"></script>
+    <script src="../js/api/punch-api.js?v=71"></script>
 
     <script>
         // ============ MULTI-CLIENT SaaS SUPPORT ============
@@ -615,12 +616,7 @@
 
         // ============ INITIALIZATION ============
 
-        // Register Service Worker
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('../sw.js')
-                .then(reg => console.log('[PWA] Service Worker registered'))
-                .catch(err => console.log('[PWA] SW registration failed:', err));
-        }
+        // Service worker is registered by js/ui/app-update.js (all pages)
 
         // Initialize
 window.onload = async function() {
@@ -1426,5 +1422,7 @@ localStorage.setItem('pwa_client_code', clientCode);
             updateLocationBar('📴 Offline Mode - Punches will sync later', true);
         });
     </script>
+    <script src="../js/ui/app-update.js?v=71"></script>
+    <script src="../js/ui/pwa-install.js?v=71"></script>
 </body>
 </html>
