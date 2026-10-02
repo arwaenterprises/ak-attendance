@@ -1,4 +1,4 @@
-// AK Attendance - Sync Manager (Multi-Client SaaS)
+// Dawam Attendance - Sync Manager (Multi-Client SaaS)
 const SyncManager = {
     isSyncing: false,
     lastSyncTime: null,

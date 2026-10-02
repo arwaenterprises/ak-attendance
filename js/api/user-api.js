@@ -1,4 +1,4 @@
-// AK Attendance - User API
+// Dawam Attendance - User API
 const UserAPI = {
     // Get all users (Admin only)
     async getAll() {

@@ -1,4 +1,4 @@
-// AK Attendance - LOP API
+// Dawam Attendance - LOP API
 const LOPAPI = {
     // Get all LOP requests (filtered by department and status)
     async getAll(status = null) {

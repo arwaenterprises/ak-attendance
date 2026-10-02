@@ -1,4 +1,4 @@
-# AK Attendance System v2.1
+# Dawam Attendance
 
 Biometric attendance system for warehouse operations with face recognition and geo-fencing.
 
@@ -40,7 +40,7 @@ Biometric attendance system for warehouse operations with face recognition and g
 
 ## Project Structure
 ```
-ak-attendance/
+dawam-attendance/
 ├── index.html              # Login page
 ├── dashboard.html          # Main dashboard
 ├── admin/                  # Admin pages
@@ -108,13 +108,11 @@ const SUPABASE_ANON_KEY = 'your-anon-key';
 
 1. Push code to GitHub repository
 2. Enable GitHub Pages (Settings → Pages → Source: main branch)
-3. Access at: `https://yourusername.github.io/ak-attendance/`
+3. Access at: `https://yourusername.github.io/<repository-name>/`
 
-## Default Login
+## First Login
 
-- **Username**: akhtar
-- **Password**: AK@2026
-- **Role**: Super Admin
+The first admin login is created by the platform owner (see `supabase/seed-staging.sql` for the staging example). Never publish passwords in this file.
 
 ## Quick Start
 
@@ -135,7 +133,7 @@ const SUPABASE_ANON_KEY = 'your-anon-key';
 
 ## License
 
-Private - M.A. Al Abdul Karim & Co
+Private
 
 ## Support
 

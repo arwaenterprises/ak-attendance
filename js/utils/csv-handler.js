@@ -1,4 +1,4 @@
-// AK Attendance - CSV Handler
+// Dawam Attendance - CSV Handler
 const CSVHandler = {
     // Parse CSV file to array of objects
     parse(csvText) {

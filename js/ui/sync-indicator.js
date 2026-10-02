@@ -1,4 +1,4 @@
-// AK Attendance - Sync Indicator (Top Right Corner)
+// Dawam Attendance - Sync Indicator (Top Right Corner)
 const SyncIndicator = {
     element: null,
 

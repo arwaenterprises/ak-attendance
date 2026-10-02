@@ -1,4 +1,4 @@
-// AK Attendance - Labor API
+// Dawam Attendance - Labor API
 const LaborAPI = {
     // Get all laborers (filtered by department for non-super-admin)
     async getAll() {
