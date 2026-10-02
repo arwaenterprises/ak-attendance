@@ -10,14 +10,15 @@ Rule for every task: do not break the existing workflow or architecture; test be
 
 ---
 
-## NOW - your next step (one at a time)
+## NOW - your next steps (two small groups, in this order)
 
 | Step | What you do | Done? |
 |------|-------------|-------|
-| 16 | Staging: migration 003 applied (verified: all 15 pages load with no failing database request, incl. the LOP lists) | Yes |
-| 17 | **STAGING project:** Supabase > Authentication > turn OFF "Allow new users to sign up" (look under "Sign In / Providers" > Email, or "Providers" in older layouts; if you cannot find it, tell me what the menu shows) and reply "done" | No |
+| 17 | Sign-ups switched off on staging | Yes |
+| 18 | **LIVE project** (the one your real users use - check the project address contains `kyktwzwiraipwyglkhva`): SQL Editor > New query > paste the whole file `supabase/migrations/003_lop_labor_fk.sql` > Run. This fixes the LOP lists (finding 58). It only adds a link between two tables and does not change any data. Reply "live done" | No |
+| 19 | **STAGING project:** (a) Authentication > Users > Add user: email `terminal@test.dawam.arwaenterprises.com`, password `test-terminal-key-1234`, tick "Auto Confirm User". (b) SQL Editor > paste the whole file `supabase/staging-terminal-bundle.sql` > Run (shows the terminal email). Reply "staging done" | No |
 
-Parked, not forgotten: licence of the update icon picture (step 11); live LOP fix (finding 58) needs your OK.
+Parked, not forgotten: licence of the update icon picture (step 11).
 
 ---
 
@@ -120,7 +121,7 @@ Design (decided by me, to confirm at step 2): users log in with **Supabase Auth*
 |---|------|----------|--------|
 | S1 | Database rules: each client sees and changes only its own rows; public key gets nothing; password hashes unreadable; clients cannot edit subscriptions; audit log append-only; functions check the caller. File `supabase/migrations/001_security_foundation.sql`. **118 checks pass on a local Postgres 16** (`bash tests/db/run.sh`, also in CI); a deliberately loosened rule makes them fail. NOT applied to any Supabase project yet (it would stop the current app) | Critical | Done (tested locally) |
 | S2 | App login with Supabase Auth on staging; single admin per client; Users page removed; app pages work under the new rules; baseline tests moved to a logged-in test user. **Built:** migration 002 (one active admin per company, usernames/settings per company, subscription/expiry enforced by the database, `link_admin_profile` for the platform owner), `loginSupabase` in auth.js (one general error message, this-device-only logout, session check on every page), Users tile/page gone with the new login, tests: 21 database checks + dry run of the exact staging procedure, 5 environment checks, 12 end-to-end login/lock-out checks (`tests/auth.test.js`). The new login is **staging-only** (`DAWAM_AUTH_MODE`); the live site keeps the old login until S5. **Verified on staging 2026-10-02:** login, lock-out of the public key, two devices, session checks (12 checks), 16 baseline + 24 update tests. Page tests found finding 58 (pre-existing on live). Remaining for S2: LOP fix on staging, sign-ups off, page tests green | Critical | In progress |
-| S3 | Punch terminal: per-client terminal key + narrow functions (face data, settings, punch save, sync) so the terminal works without an open database | Critical | Todo |
+| S3 | Punch terminal: its own identity (role `terminal`, login = terminal key) and ONLY narrow database functions (`terminal_bootstrap`, `terminal_record_punch`, `terminal_punch_state`, `terminal_today_punches`, `terminal_low_confidence`); a terminal cannot read or write any table; downloads no salaries or ID numbers any more (finding 59). Migration 004 + 70 database checks (local), `js/api/terminal-api.js`, punch page and sync manager switched over for the new login only. Terminal link looks like `punch/?client=CODE#key=KEY` (the key is kept on the device and removed from the address bar). **Built; database side tested locally; browser tests written (`tests/terminal.test.js`), waiting for the staging step 19** | Critical | In progress |
 | S4 | Punch photos private (signed links); labor self-enrollment page through a safe function; storage rules | High | Todo |
 | S5 | Login attempt limits, audit review, remove the temporary open policies, **live cutover plan** (migrate the live admin accounts, switch the live project) with a rollback | Critical | Todo |
 
@@ -173,6 +174,9 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 | 57 | **Devices that still run the OLD app (before version 72) cannot be told to update.** The old app has no update code, and its old cache-first service worker keeps serving the old pages until the browser itself notices the new `sw.js` (browsers check on opening, at most about once a day; verify). Simulated in a real browser: once noticed, the new service worker takes over within seconds and the next open shows the new UI. From version 72 on, devices check themselves (red dot + popup). Manual remedy if urgent: clear the site's data, BUT only after confirming no offline punches are waiting to sync, and then reopen the punch terminal with its `?client=CODE` address (the installed app's start address has no client code) | Medium | Known, documented |
 
 | 58 | **LOP lists cannot load - on the LIVE site too.** `attendance/lop.html` (pending / approved / rejected / draft lists) asks for `laborers:labor_id(...)` but the database has no foreign key `lop_requests.labor_id -> laborers.labor_id`, so it answers 400 "Could not find a relationship". Found by the new page tests; **confirmed on live with one read-only request that returns no rows**. Fix: `supabase/migrations/003_lop_labor_fk.sql` (adds the key as NOT VALID so old data cannot block it). Staging first; for live it needs your OK and one paste (also check the page after) | High | Fix written and tested locally; staging next; live needs your OK |
+
+| 59 | **The old terminal downloads full laborer records** (`select *`: monthly salary, ID number, nationality ...) to every tablet and keeps them in the browser. With the new terminal (migration 004) a terminal receives only name, labor id, department and face data | High | Fixed in the new terminal (staging); live after cutover |
+| 60 | **Automatic LOP drafts never happen.** `PunchAPI.savePunch` calls `LOPAPI.autoCreateDraft` after the broken `rpc(...).catch` line (finding 53), and the offline sync never calls it, so the "auto-suggested" LOP drafts are not created by punching. The new terminal functions do not create them either (same result as today); decide later whether you want this feature | Medium | Needs your decision |
 
 ---
 

@@ -89,6 +89,9 @@ check('login email domain is the same in js/config/supabase.js and migration 002
 const bundleFile = path.join(ROOT, 'supabase/staging-security-bundle.sql');
 check('supabase/staging-security-bundle.sql is up to date (run: node tools/build-staging-bundle.js)',
   fs.existsSync(bundleFile) && fs.readFileSync(bundleFile, 'utf8') === require('../tools/build-staging-bundle.js').bundle());
+const termFile = path.join(ROOT, 'supabase/staging-terminal-bundle.sql');
+check('supabase/staging-terminal-bundle.sql is up to date (run: node tools/build-staging-bundle.js)',
+  fs.existsSync(termFile) && fs.readFileSync(termFile, 'utf8') === require('../tools/build-staging-bundle.js').terminalBundle());
 check('live site keeps the old login until the cutover (DAWAM_AUTH_MODE is staging-only)', /DAWAM_AUTH_MODE\s*=\s*DAWAM_IS_STAGING\s*\?\s*'supabase'\s*:\s*'legacy'/.test(supaJs));
 
 // version must be bumped when app files changed (CI sets BASE_SHA)

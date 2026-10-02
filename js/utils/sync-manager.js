@@ -92,6 +92,7 @@ const SyncManager = {
     // Sync offline punches to server
     async syncPunches() {
         if (!this.isOnline()) return;
+        if (typeof TerminalAPI !== 'undefined' && TerminalAPI.active) return this.syncPunchesTerminal();   // new login: the database applies the punch rules
 
         const clientId = this.getClientId();
         if (!clientId) {
@@ -344,9 +345,50 @@ const SyncManager = {
         }
     },
 
+    // New login (terminal): descriptors and locations come from one terminal function call
+    async downloadTerminalData() {
+        try {
+            const boot = await TerminalAPI.bootstrap();
+            if (!boot.ok) throw new Error(boot.error);
+            const descriptors = (boot.data.laborers || []).map(l => ({ laborId: l.labor_id, name: l.name, departmentId: l.department_id, descriptor: l.face_descriptor }));
+            await OfflineStorage.saveFaceDescriptors(descriptors);
+            await OfflineStorage.savePunchLocations(boot.data.locations || []);
+            console.log(`[SyncManager] Terminal data: ${descriptors.length} descriptors, ${(boot.data.locations || []).length} locations`);
+        } catch (error) {
+            console.error('[SyncManager] Terminal data download error:', error);
+        }
+    },
+
+    // New login (terminal): upload offline punches through the terminal function. The database fixes the night-shift date,
+    // ignores duplicates and recalculates attendance. A punch is only marked as synced after the database accepted it.
+    async syncPunchesTerminal() {
+        try {
+            const unsynced = await OfflineStorage.getUnsyncedPunches();
+            if (unsynced.length === 0) return;
+            console.log(`[SyncManager] Syncing ${unsynced.length} punches (terminal)...`);
+            for (const punch of unsynced) {
+                try {
+                    let photoUrl = punch.photoUrl || null;
+                    if (punch.photoBlob) {
+                        const photo = await PunchAPI.uploadPhoto(punch.laborId, punch.photoBlob);
+                        if (photo.success) photoUrl = photo.url;
+                    }
+                    const res = await TerminalAPI.recordPunch({ ...punch, photoUrl });
+                    if (res.success) await OfflineStorage.markPunchSynced(punch.id);
+                    else console.error(`[SyncManager] Punch ${punch.id} not accepted:`, res.error);
+                } catch (err) {
+                    console.error(`[SyncManager] Failed to sync punch ${punch.id}:`, err);
+                }
+            }
+        } catch (error) {
+            console.error('[SyncManager] Terminal sync error:', error);
+        }
+    },
+
     // Download face descriptors from server - FILTERED BY CLIENT
     async downloadFaceDescriptors() {
         if (!this.isOnline()) return;
+        if (typeof TerminalAPI !== 'undefined' && TerminalAPI.active) return this.downloadTerminalData();
 
         const clientId = this.getClientId();
         if (!clientId) {
@@ -383,6 +425,7 @@ const SyncManager = {
     // Download punch locations from server - FILTERED BY CLIENT
     async downloadPunchLocations() {
         if (!this.isOnline()) return;
+        if (typeof TerminalAPI !== 'undefined' && TerminalAPI.active) return this.downloadTerminalData();
 
         const clientId = this.getClientId();
         if (!clientId) {
