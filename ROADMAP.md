@@ -14,9 +14,9 @@ Rule for every task: do not break the existing workflow or architecture; test be
 
 | Step | What you do | Done? |
 |------|-------------|-------|
-| 1 | In the NEW Supabase project: SQL Editor > New query > paste `supabase/schema.sql` > Run | No |
-| 2 | Same again with `supabase/policies-temporary-open.sql` | No |
-| 3 | Tell me: "ok" or paste the error message | No |
+| 1 | NEW Supabase project: run `supabase/schema.sql` | Yes |
+| 2 | NEW Supabase project: run `supabase/policies-temporary-open.sql` | Yes |
+| 3 | NEW Supabase project: SQL Editor > New query > paste `supabase/seed-staging.sql` > Run, then reply "ok" | No |
 
 Only these steps are yours right now. Everything else is mine until I ask.
 
@@ -47,7 +47,8 @@ Only these steps are yours right now. Everything else is mine until I ask.
 | 2 | Set up a free second Supabase project (new/staging), so real-database checks never touch live data. Owner creates it; guide in chat | High | In progress (owner creating) |
 | 2a | Export the REAL schema and build `supabase/schema.sql` from it | High | Done (export received 2026-10-02; schema.sql written, NOT yet run on any project) |
 | 2c | Run `supabase/schema.sql` then `supabase/policies-temporary-open.sql` on the NEW project and report any error. Both ran without errors on a local Postgres 16 (with stand-ins for Supabase's roles/storage); not yet run on real Supabase | High | Todo (owner) |
-| 2d | Create staging data on the new project: one client, one admin user, settings keys (night_shift_start/end, min hours, confidence thresholds, punch limit). Data is not in the export | High | Todo |
+| 2d | Create staging data on the new project: one client, one admin user, settings keys. File: `supabase/seed-staging.sql` (tested on local Postgres) | High | In progress (owner to run) |
+| 2e | Point a staging copy of the app at the new project (different Supabase URL/key; must NOT change the live site). Plan needed for how/where staging is hosted | High | Todo |
 | 2b | Keep `supabase/schema.sql` updated with every database change from now on (see D8) | Medium | Todo |
 | 3 | Add CI (GitHub Actions) running the tests and static checks on every push | Medium | Todo |
 
@@ -175,5 +176,6 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 | Date | Change |
 |------|--------|
 | 2026-10-02 | Roadmap created from the code review. No application code changed yet. |
+| 2026-10-02 | Owner ran schema.sql and policies-temporary-open.sql on the new project successfully. Added `supabase/seed-staging.sql`. |
 | 2026-10-02 | Real database export received; `supabase/schema.sql` and `policies-temporary-open.sql` written; findings 43-51 added (security is worse than the code review suggested). |
 | 2026-10-02 | Added 4-hour lock rule (tasks 20-24a), schema tasks (2a, 2b), `supabase/` folder with export query and schema skeleton. |
