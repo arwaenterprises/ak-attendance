@@ -31,14 +31,16 @@ Why S5 comes before IN/OUT and the lock: those rules live in the new terminal pa
 
 ---
 
-## NOW - your next step
+## NOW - decisions I need from you (S5 live cutover)
 
-| Step | What you do | Done? |
-|------|-------------|-------|
-| 22 | Staging: migration 006 applied (verified: 14 of 14 photo and self-enrollment checks on the real storage service) | Yes |
-| 23 | Next (S5, the last security step): the **live cutover plan**. Reply "go" and I will first explain in plain words what changes for your real users and what you must prepare | No |
+Read the plan: [supabase/CUTOVER_PLAN.md](https://github.com/arwaenterprises/ak-attendance/blob/claude/cool-cannon-o7cbyn/supabase/CUTOVER_PLAN.md). Key finding: your live Supabase project is shared with the pharmacy, expense and logigate apps, so my security migrations must NOT be run there (they would break those apps). Recommended: attendance gets its own database (the staging project, promoted).
 
-Parked, not forgotten: licence of the update icon picture (step 11); LOP auto-drafts decision (finding 60).
+| # | Decision | Answer |
+|---|----------|--------|
+| 1 | Own database for attendance (recommended)? | |
+| 2 | The 3 active supervisors in AE1: remove, or keep a supervisor login? | |
+| 3 | AE2 (1 laborer, 2 departments): migrate or leave? | |
+| 4 | Number of terminals for AE1; best time for a 30-60 minute window | |
 
 ---
 
