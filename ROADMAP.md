@@ -14,8 +14,8 @@ Rule for every task: do not break the existing workflow or architecture; test be
 
 | Step | What you do | Done? |
 |------|-------------|-------|
-| 12 | Pages source switched to GitHub Actions | Yes |
-| 13 | Nothing. I am publishing the app-only site through a merge to main and will verify it | - |
+| 12-13 | Pages switched to Actions; app-only site published and verified | Yes |
+| 14 | Reply "go" for the next single step: the security block, step 1 of 5 (see section B, tasks 29-35) | No |
 
 Parked, not forgotten: licence of the update icon picture (step 11).
 
@@ -155,7 +155,7 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 
 | 55 | **README published a default Super Admin login** (username `akhtar`, a password). Removed from the README, but it stays in the repository history. If that password is still used anywhere, change it now. Also check whether this repository is public | High | Needs your action |
 
-| 56 | **(IN PROGRESS: app-only publishing built and tested, waiting for the Pages source setting, step 12)** **GitHub Pages publishes the whole repository on your live domain.** Confirmed reachable today: `/ROADMAP.md` (this file, with the security findings), `/supabase/schema.sql`, `/supabase/seed-staging.sql` (staging test login in a comment), `/tests/harness.html`. Anyone can read the database structure and the list of weaknesses. The anon key is public anyway, but a roadmap of open holes should not be. Fix: publish only the app files with a small GitHub Actions workflow (and switch Settings > Pages > Source to "GitHub Actions"). Until then, treat everything in this repository as public. Also answers the earlier question whether the repo is public: Pages exposure is the same either way | High | In progress (step 12) |
+| 56 | **(FIXED 2026-10-02: Pages now publishes only app files; ROADMAP.md, README.md, supabase/, tests/ return 404 on the live domain. They remain in git history and in the GitHub repository itself: treat the repository as private-grade content, and check its visibility)** **GitHub Pages publishes the whole repository on your live domain.** Confirmed reachable today: `/ROADMAP.md` (this file, with the security findings), `/supabase/schema.sql`, `/supabase/seed-staging.sql` (staging test login in a comment), `/tests/harness.html`. Anyone can read the database structure and the list of weaknesses. The anon key is public anyway, but a roadmap of open holes should not be. Fix: publish only the app files with a small GitHub Actions workflow (and switch Settings > Pages > Source to "GitHub Actions"). Until then, treat everything in this repository as public. Also answers the earlier question whether the repo is public: Pages exposure is the same either way | High | Done |
 
 | 57 | **Devices that still run the OLD app (before version 72) cannot be told to update.** The old app has no update code, and its old cache-first service worker keeps serving the old pages until the browser itself notices the new `sw.js` (browsers check on opening, at most about once a day; verify). Simulated in a real browser: once noticed, the new service worker takes over within seconds and the next open shows the new UI. From version 72 on, devices check themselves (red dot + popup). Manual remedy if urgent: clear the site's data, BUT only after confirming no offline punches are waiting to sync, and then reopen the punch terminal with its `?client=CODE` address (the installed app's start address has no client code) | Medium | Known, documented |
 
@@ -187,6 +187,7 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 |------|--------|
 | 2026-10-02 | Roadmap created from the code review. No application code changed yet. |
 | 2026-10-02 | Owner ran schema.sql and policies-temporary-open.sql on the new project successfully. Added `supabase/seed-staging.sql`. |
+| 2026-10-02 | **Finding 56 FIXED:** app-only site published by the Publish site workflow (run 1 green). Verified live: app pages 200, ROADMAP.md / supabase / tests / README 404, version still 73. |
 | 2026-10-02 | Owner switched Pages source to GitHub Actions. My tool is not allowed to start workflows (403), so the Publish workflow now also runs on every push to main; merging that change publishes the app-only site. |
 | 2026-10-02 | Finding 56 fix prepared: `tools/build-site.js` (allow-list of public files), static checks for it, `.github/workflows/pages.yml` (manual start only for now). Built site passes the 15-page smoke test. |
 | 2026-10-02 | Owner's own update icon (`icons/ui-update.png`) now used everywhere; on the punch terminal it sits next to "View My Attendance". Install prompt is now a centred card shown at start (Install / Not now; iPhone shows Add to Home Screen steps). Version 73. 24 update tests + 15 smoke tests pass. **Merged to live (PR 10, version 73, 16:33 UTC).** Old-device upgrade simulated: works once the browser detects the new service worker (finding 57). |
