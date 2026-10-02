@@ -1,0 +1,24 @@
+name: Tests
+
+# Runs the baseline tests (tests/) against the STAGING Supabase project on every push and pull request.
+# Not yet run on GitHub: first run may need small fixes.
+on:
+  push:
+  pull_request:
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install test tools
+        working-directory: tests
+        run: |
+          npm install
+          npx playwright install --with-deps chromium
+      - name: Baseline tests
+        working-directory: tests
+        run: npm test

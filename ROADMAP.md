@@ -15,7 +15,7 @@ Rule for every task: do not break the existing workflow or architecture; test be
 | Step | What you do | Done? |
 |------|-------------|-------|
 | 1-5 | NEW Supabase project fully set up (structure, policies, test data, clients policy) | Yes |
-| 6 | Reply "go" to start my next block: baseline tests (task 1), then update mechanism + PWA + rename (tasks 4-12) | No |
+| 6 | Reply "go" (done). Baseline tests are finished; I am now building the update mechanism + PWA + rename (tasks 4-12). Nothing needed from you yet | Yes |
 
 Only these steps are yours right now. Everything else is mine until I ask.
 
@@ -42,7 +42,7 @@ Only these steps are yours right now. Everything else is mine until I ask.
 
 | # | Task | Severity | Status |
 |---|------|----------|--------|
-| 1 | Write baseline tests of today's behaviour (punch, offline sync, night shift, reports) against a fake Supabase, run them green BEFORE any change | High | Todo |
+| 1 | Baseline tests of today's behaviour against the STAGING Supabase (login, 2 devices, punch type, punch limit, night-shift dates, daily hours, offline sync, timezone). `tests/` folder, run: `cd tests && npm install && npm test`. **16 pass.** Refuses to run unless pointed at staging. Reports pages/screens are NOT covered yet | High | Done (reports and UI still to add) |
 | 2 | Set up a free second Supabase project (new/staging), so real-database checks never touch live data. Owner creates it; guide in chat | High | In progress (owner creating) |
 | 2a | Export the REAL schema and build `supabase/schema.sql` from it | High | Done (export received 2026-10-02; schema.sql written, NOT yet run on any project) |
 | 2c | Run `supabase/schema.sql` then `supabase/policies-temporary-open.sql` on the NEW project and report any error. Both ran without errors on a local Postgres 16 (with stand-ins for Supabase's roles/storage); not yet run on real Supabase | High | Todo (owner) |
@@ -50,7 +50,7 @@ Only these steps are yours right now. Everything else is mine until I ask.
 | 2e | Staging config: app uses the new project ONLY on localhost / 127.0.0.1 / `staging.*` hosts; every other address (live site included) uses the live project; red STAGING badge; `sw.js` v69. **Tested:** login TEST / admin / Test@1234 on a local copy reaches the dashboard against the new project, contacting only the new project | High | Done |
 | 2f | Decide where a shared staging page lives (e.g. a `staging.` address) so you can try it on a phone. Not needed yet; I test locally first | Low | Todo |
 | 2b | Keep `supabase/schema.sql` updated with every database change from now on (see D8) | Medium | Todo |
-| 3 | Add CI (GitHub Actions) running the tests and static checks on every push | Medium | Todo |
+| 3 | CI (GitHub Actions): `.github/workflows/tests.yml` runs the baseline tests on every push. Static checks (version numbers, SW file list) still to add. Workflow not yet run on GitHub | Medium | In progress |
 
 ### 2. App update, service worker, PWA
 
@@ -149,6 +149,10 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 | 50 | `punch_records`, `attendance_freeze`, `holidays`, `ot_rates`, `overtime_records` and `enrollment_links` have no link (foreign key) to `clients`, and `punch_records` has no rule stopping duplicate or too-close punches. The 4-hour lock must be added at database level | Medium | Todo |
 | 51 | `admin_users` table: attendance code does not use it. Confirm it belongs to another app before leaving it behind | Low | Needs your answer |
 
+| 52 | **Date and time disagree around midnight.** `DateUtils.today()` uses the UTC date but `DateUtils.now()` uses the device's local time. At 01:00 in Riyadh (UTC+3) the app records yesterday's date with time 01:00. Proven by a test with the clock set to Riyadh time. Affects punches between 00:00 and 03:00 local, i.e. the end of night shifts. Verify with real data | High | Todo (fix with shift work, tasks 23-24) |
+| 53 | **Online punches look failed.** In `PunchAPI.savePunch` the line `supabaseClient.rpc(...).catch(...)` raises "catch is not a function" (with the supabase-js version the CDN serves today) AFTER the punch is saved. The function then returns `success: false`, so the terminal saves the punch a second time offline; the duplicate is skipped later by the sync (same date and time). Side effects: daily attendance and the draft LOP check are NOT triggered online, only when the offline copy syncs. Proven by a test. Not certain it behaves the same on every device (the service worker may serve an older cached copy of the library): check live data | High | Todo (fix with tasks 20-24) |
+| 54 | **Do not rename storage names when removing "AK".** The offline database is called `AKAttendanceDB` and the login session key is `ak_attendance_session`. Renaming them would log everyone out and orphan punches waiting to sync. Rename only visible text, titles, the cache name and the manifest; migrate storage names later with a copy step (task 12) | Medium | Decided |
+
 ---
 
 ## D. Feedback and suggestions
@@ -177,6 +181,7 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 |------|--------|
 | 2026-10-02 | Roadmap created from the code review. No application code changed yet. |
 | 2026-10-02 | Owner ran schema.sql and policies-temporary-open.sql on the new project successfully. Added `supabase/seed-staging.sql`. |
+| 2026-10-02 | Baseline tests written (16 pass on staging). They found 2 new bugs: findings 52, 53. CI workflow added, not yet run on GitHub. |
 | 2026-10-02 | Owner applied the clients policy; staging login test passes (dashboard reached on new project). Task 2e done. |
 | 2026-10-02 | Environment switch added (staging vs live), sw.js v69. Found by testing: `clients` had no open policy on the new project (login said Invalid client code); fixed in policies-temporary-open.sql, owner to run one line. |
 | 2026-10-02 | Owner ran seed-staging.sql successfully. Next: staging app config (task 2e). |

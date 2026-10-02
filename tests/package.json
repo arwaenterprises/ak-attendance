@@ -1,0 +1,6 @@
+{
+  "name": "dawam-attendance-tests",
+  "private": true,
+  "scripts": { "test": "node baseline.test.js" },
+  "devDependencies": { "playwright": "1.56.1" }
+}
