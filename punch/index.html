@@ -530,13 +530,14 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="../js/config/supabase.js?v=74"></script>
-    <script src="../js/utils/date-utils.js?v=74"></script>
-    <script src="../js/utils/photo-utils.js?v=74"></script>
-    <script src="../js/utils/offline-storage.js?v=74"></script>
-    <script src="../js/utils/sync-manager.js?v=74"></script>
-    <script src="../js/api/labor-api.js?v=74"></script>
-    <script src="../js/api/punch-api.js?v=74"></script>
+    <script src="../js/config/supabase.js?v=75"></script>
+    <script src="../js/utils/date-utils.js?v=75"></script>
+    <script src="../js/utils/photo-utils.js?v=75"></script>
+    <script src="../js/utils/offline-storage.js?v=75"></script>
+    <script src="../js/utils/sync-manager.js?v=75"></script>
+    <script src="../js/api/labor-api.js?v=75"></script>
+    <script src="../js/api/punch-api.js?v=75"></script>
+    <script src="../js/api/terminal-api.js?v=75"></script>
 
     <script>
         // ============ MULTI-CLIENT SaaS SUPPORT ============
@@ -607,6 +608,17 @@
             }
         }
 
+        // New login: the terminal signs in with its terminal key and loads its data through the narrow terminal functions
+        async function validateTerminalClient(clientCode) {
+            const started = await TerminalAPI.start(clientCode);
+            if (!started.ok) return { valid: false, error: started.error };
+            const boot = await TerminalAPI.bootstrap({ fresh: true });
+            if (!boot.ok) return { valid: false, error: boot.error };
+            const c = boot.data.client;
+            if (!c || !c.subscribed_apps || !c.subscribed_apps.includes('attendance')) return { valid: false, error: 'Attendance app not subscribed' };
+            return { valid: true, clientId: c.id, clientCode: c.client_code, businessName: c.business_name };
+        }
+
         // Show invalid client error
         function showInvalidClientError(message) {
             document.getElementById('loadingScreen').classList.add('hidden');
@@ -628,6 +640,9 @@ window.onload = async function() {
     } catch (e) {
         console.warn('[Init] IndexedDB unavailable, continuing without offline storage:', e);
     }
+
+    // New login: from the very start this page is a terminal (also when it starts offline), so later uploads use the terminal functions
+    if (DAWAM_AUTH_MODE === 'supabase') TerminalAPI.active = true;
 
     // Step 2: Get client code from URL or localStorage
 let clientCode = getClientCodeFromURL();
@@ -666,7 +681,7 @@ localStorage.setItem('pwa_client_code', clientCode);
         }
     } else {
         // Online - validate against database
-        const validation = await validateClient(clientCode);
+        const validation = (DAWAM_AUTH_MODE === 'supabase') ? await validateTerminalClient(clientCode) : await validateClient(clientCode);
         
         if (!validation.valid) {
             showInvalidClientError(validation.error);
@@ -738,6 +753,18 @@ localStorage.setItem('pwa_client_code', clientCode);
         // Load initial data (online) - NOW WITH CLIENT FILTER
         async function loadInitialData() {
             try {
+                if (DAWAM_AUTH_MODE === 'supabase') {
+                    // New login: one call returns laborers (face data only), settings and locations
+                    TerminalAPI.active = true;
+                    const boot = await TerminalAPI.bootstrap();
+                    if (!boot.ok) throw new Error(boot.error);
+                    allLaborers = boot.data.laborers || [];
+                    Object.assign(settings, boot.data.settings || {});
+                    await SyncManager.downloadFaceDescriptors();
+                    await SyncManager.downloadPunchLocations();
+                    console.log(`[Online] Loaded ${allLaborers.length} laborers (terminal login)`);
+                    return;
+                }
                 // Load laborers for THIS CLIENT ONLY
                 const { data, error } = await supabaseClient
                     .from('laborers')
@@ -937,7 +964,7 @@ localStorage.setItem('pwa_client_code', clientCode);
             if (window.userCoords) {
                 let locResult;
                 
-                if (isOfflineMode) {
+                if (isOfflineMode || DAWAM_AUTH_MODE === 'supabase') {   // new login: locations come from the copy kept on the device
                     locResult = await findNearestLocationOffline(
                         window.userCoords.lat,
                         window.userCoords.lng,
@@ -1024,14 +1051,14 @@ localStorage.setItem('pwa_client_code', clientCode);
 
                 if (confidence < minConfidence) {
                     if (confidence < reenrollThreshold) {
-                        await LaborAPI.incrementLowConfidence(currentLabor.labor_id);
+                        await (DAWAM_AUTH_MODE === 'supabase' ? TerminalAPI.lowConfidence(currentLabor.labor_id) : LaborAPI.incrementLowConfidence(currentLabor.labor_id));
                     }
                     throw new Error(`Face not matched (${confidence}% confidence). Please try again or contact supervisor.`);
                 }
 
                 // Check punch limit (skip if offline)
                 if (!isOfflineMode && navigator.onLine) {
-                    const limitCheck = await PunchAPI.checkPunchLimit(currentLabor.labor_id);
+                    const limitCheck = await (DAWAM_AUTH_MODE === 'supabase' ? TerminalAPI : PunchAPI).checkPunchLimit(currentLabor.labor_id);
                     if (!limitCheck.allowed) {
                         throw new Error(`Punch limit reached (${limitCheck.max} per day)`);
                     }
@@ -1049,7 +1076,7 @@ localStorage.setItem('pwa_client_code', clientCode);
                     const lastPunch = todayPunches[todayPunches.length - 1];
                     punchType = (!lastPunch || lastPunch.type === 'logout') ? 'login' : 'logout';
                 } else {
-                    punchType = await PunchAPI.getNextPunchType(currentLabor.labor_id);
+                    punchType = await (DAWAM_AUTH_MODE === 'supabase' ? TerminalAPI : PunchAPI).getNextPunchType(currentLabor.labor_id);
                 }
 
                 // Save punch record
@@ -1079,7 +1106,7 @@ localStorage.setItem('pwa_client_code', clientCode);
                     punchData.photoUrl = photoUrl;
                     delete punchData.photoBlob;
 
-                    const saveResult = await PunchAPI.savePunch(punchData);
+                    const saveResult = await (DAWAM_AUTH_MODE === 'supabase' ? TerminalAPI : PunchAPI).savePunchCompat(punchData);
                     if (!saveResult.success) {
                         punchData.photoBlob = photoBlob;
                         await OfflineStorage.savePunch(punchData);
@@ -1286,13 +1313,18 @@ localStorage.setItem('pwa_client_code', clientCode);
 
             try {
                 const todayStr = DateUtils.today();
-                const { data: punches, error } = await supabaseClient
-                    .from('punch_records')
-                    .select('*')
-                    .eq('client_id', CLIENT_SESSION.clientId)  // Filter by client
-                    .eq('labor_id', labor.labor_id)
-                    .eq('date', todayStr)
-                    .order('created_at', { ascending: true });
+                let punches, error;
+                if (DAWAM_AUTH_MODE === 'supabase') {
+                    ({ data: punches, error } = await TerminalAPI.todayPunches(labor.labor_id, todayStr));
+                } else {
+                    ({ data: punches, error } = await supabaseClient
+                        .from('punch_records')
+                        .select('*')
+                        .eq('client_id', CLIENT_SESSION.clientId)  // Filter by client
+                        .eq('labor_id', labor.labor_id)
+                        .eq('date', todayStr)
+                        .order('created_at', { ascending: true }));
+                }
 
                 if (error) throw error;
 
@@ -1422,7 +1454,7 @@ localStorage.setItem('pwa_client_code', clientCode);
             updateLocationBar('📴 Offline Mode - Punches will sync later', true);
         });
     </script>
-    <script src="../js/ui/app-update.js?v=74"></script>
-    <script src="../js/ui/pwa-install.js?v=74"></script>
+    <script src="../js/ui/app-update.js?v=75"></script>
+    <script src="../js/ui/pwa-install.js?v=75"></script>
 </body>
 </html>
