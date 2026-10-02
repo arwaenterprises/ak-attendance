@@ -9,6 +9,7 @@ const fs = require('fs');
 const KEY = 'test-terminal-key-1234';
 const rid = Math.random().toString(36).slice(2, 7).toUpperCase();
 const LABOR = 'TRM' + rid;
+const FACE0 = Math.round((0.5 + Math.floor(Math.random() * 9000) / 20000) * 1e5) / 1e5;   // unique per run, so labors left by earlier runs never match
 const pad = n => String(n).padStart(2, '0');
 const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
 
@@ -24,12 +25,13 @@ const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.get
   await admin.waitForFunction(() => typeof AUTH !== 'undefined');
   const al = await admin.evaluate(() => AUTH.login('TEST', 'admin', 'Test@1234'));
   if (!al.success) { console.error('admin login failed - staging not set up? ' + JSON.stringify(al)); process.exit(2); }
+  await admin.evaluate((f) => { window.__F0 = f; }, FACE0);
   const setup = await admin.evaluate(async (LABOR) => {
     const cid = AUTH.getClientId(), r = LABOR.slice(3);
     const d = await supabaseClient.from('departments').insert({ name: 'TERM ' + r, code: 'T' + r, client_id: cid }).select().single();
     const iq = '8' + String(Math.floor(Math.random() * 1e9)).padStart(9, '0');
     await supabaseClient.from('iqama_registry').insert({ iqama_number: iq, labor_id: LABOR, client_id: cid });
-    const l = await supabaseClient.from('laborers').insert({ labor_id: LABOR, iqama_number: iq, name: 'Terminal Test', nationality: 'X', date_of_joining: '2020-01-01', department_id: d.data.id, client_id: cid, face_enrolled: true, face_descriptor: [0.77, 0.11, 0.55], monthly_salary: 4321 });
+    const l = await supabaseClient.from('laborers').insert({ labor_id: LABOR, iqama_number: iq, name: 'Terminal Test', nationality: 'X', date_of_joining: '2020-01-01', department_id: d.data.id, client_id: cid, face_enrolled: true, face_descriptor: [window.__F0, 0.11, 0.55], monthly_salary: 4321 });
     const loc = await supabaseClient.from('punch_locations').insert({ name: 'Gate ' + r, department_id: d.data.id, latitude: 1, longitude: 1, client_id: cid }).select().single();
     return { dept: d.data && d.data.id, labor: !l.error, loc: loc.data && loc.data.id, err: (d.error || l.error || loc.error || {}).message };
   }, LABOR);
@@ -41,6 +43,8 @@ const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.get
     const cid = AUTH.getClientId();
     const mk = (date, fi, lo, h, st) => ({ labor_id: a.L, department_id: a.dept, date, first_login: fi, last_logout: lo, total_hours: h, auto_status: st, client_id: cid });
     const r1 = await supabaseClient.from('daily_attendance').insert([mk(a.d1, '06:00', '16:00', 10, 'P'), mk(a.d2, '06:00', '10:00', 4, 'H'), mk(a.d3, null, null, 0, 'A'), mk(a.prev, '06:00', '15:00', 9, 'P')]);
+    const r3 = await supabaseClient.from('punch_records').insert({ labor_id: a.L, department_id: a.dept, date: a.d1, time: '06:15:00', type: 'login', location_name: 'Gate', client_id: cid });
+    if (r3.error) return { e1: r3.error.message };
     const r2 = await supabaseClient.from('holidays').upsert({ client_id: cid, date: a.hol, name: 'Test holiday' }, { onConflict: 'client_id,date' });
     return { e1: r1.error && r1.error.message, e2: r2.error && r2.error.message };
   }, { L: LABOR, dept: setup.dept, d1: ymd(thisStart), d2: ymd(new Date(thisStart.getTime() + 86400000 * 1)), d3: ymd(new Date(thisStart.getTime() + 86400000 * 2)), hol: ymd(new Date(thisStart.getTime() + 86400000 * 4)), prev: ymd(prevDay) });
@@ -53,30 +57,28 @@ const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.get
   await page.waitForFunction(() => document.getElementById('mainContainer').style.display === 'flex', null, { timeout: 45000 });
   await page.waitForFunction((L) => allLaborers.some(l => l.labor_id === L), LABOR, { timeout: 20000 });
   await page.waitForFunction(() => !document.getElementById('statusOverlay').classList.contains('active'), null, { timeout: 15000 }).catch(() => {});
-  // a punch today so the day list has something to show
-  const todayRec = await page.evaluate(async (a) => TerminalAPI.recordPunch({ laborId: a.L, type: 'login', date: DateUtils.today(), time: '06:15:00', locationName: 'Gate', confidence: 90, locationId: a.loc }), { L: LABOR, loc: setup.loc });
-  ok(todayRec.success, JSON.stringify(todayRec));
   // stand-in for the face check: only the test labor's face matches
-  await page.evaluate(() => {
+  await page.evaluate((f0) => {
     modelsLoaded = true;
     window.faceapi = { TinyFaceDetectorOptions: function () {},
-      euclideanDistance: (a, b) => (Math.abs(a[0] - 0.77) < 0.001 ? 0.05 : 0.9),
-      detectSingleFace: () => ({ withFaceLandmarks: () => ({ withFaceDescriptor: async () => ({ descriptor: new Float32Array([0.77, 0.11, 0.55]) }) }) }) };
-  });
+      euclideanDistance: (a, b) => (Math.abs(a[0] - f0) < 0.00002 ? 0.05 : 0.9),
+      detectSingleFace: () => ({ withFaceLandmarks: () => ({ withFaceDescriptor: async () => ({ descriptor: new Float32Array([f0, 0.11, 0.55]) }) }) }) };
+  }, FACE0);
 
   console.log('My attendance');
   await test('"View my attendance" identifies the labor and shows this month: name, title, totals, letters on the days', async () => {
     await page.click('.view-attendance-link');
     await page.waitForFunction(() => document.getElementById('attendanceModal').classList.contains('active') && document.querySelectorAll('#calGrid .cal-day').length > 0, null, { timeout: 30000 });
-    ok(/Terminal Test/.test(await page.locator('#attendanceInfo').innerText()));
+    ok(new RegExp(LABOR).test(await page.locator('#attendanceInfo').innerText()), 'the screen shows this labor: ' + await page.locator('#attendanceInfo').innerText());
     eq(await page.locator('#monthTitle').innerText(), now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }));
     const totals = await page.locator('#monthTotals').innerText();
-    ok(/1\s*Present/.test(totals) && /1\s*Half day/.test(totals) && /1\s*Absent/.test(totals) && /14h/.test(totals), 'totals: ' + totals);
+    ok(/1\s*Present/.test(totals) && /1\s*Half day/.test(totals) && /1\s*Absent/.test(totals) && /14h/.test(totals), 'totals: ' + JSON.stringify(totals) + ' cells: ' + JSON.stringify(await page.evaluate(() => [...document.querySelectorAll("#calGrid .cal-day")].filter(b => b.className.trim() !== 'cal-day').map(b => b.dataset.date + ':' + b.className))));
     eq(await page.locator('#calGrid .cal-day.p').count(), 1); eq(await page.locator('#calGrid .cal-day.h').count(), 1);
     eq(await page.locator('#calGrid .cal-day.a').count(), 1); eq(await page.locator('#calGrid .cal-day.o').count(), 1);
   });
-  await test('today is selected and its punches are listed (IN with the time)', async () => {
-    await page.waitForFunction(() => /IN/.test(document.getElementById('attendanceList').innerText), null, { timeout: 15000 });
+  await test('tapping a day lists its punches (IN with the time)', async () => {
+    await page.click('#calGrid .cal-day[data-date="' + ymd(thisStart) + '"]');
+    await page.waitForFunction(() => /IN/.test(document.getElementById('attendanceList').innerText), null, { timeout: 15000 }).catch(async () => { throw new Error('list shows: ' + JSON.stringify(await page.locator('#attendanceList').innerText()) + ' title: ' + await page.locator('#dayTitle').innerText()); });
     ok(/06:15|6:15/.test(await page.locator('#attendanceList').innerText()), await page.locator('#attendanceList').innerText());
   });
   await test('the next-month button is off (nothing after this month); the previous month opens with its own data', async () => {

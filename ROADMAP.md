@@ -12,17 +12,17 @@ Rule for every task: do not break the existing workflow or architecture; test be
 
 ## PROGRESS (updated after every finished task)
 
-**Overall: about 54% complete** (my estimate: the weights are judgement, not measurement)
+**Overall: about 68% complete** (my estimate: the weights are judgement, not measurement)
 
 | Area (what you asked for) | Weight | Done | Status |
 |---|---|---|---|
 | App update popup, PWA install, offline, new update icon, rename to Dawam | 15% | 100% | Live |
 | Security: database closed, new login, terminal, private photos, live cutover (S1-S5) | 30% | 97% | **LIVE** since 2026-10-02 (v77). Left: remove old login code after a stable period, delete the archived other-app tables when you decide |
 | One admin per client, Users page removed, many devices | 5% | 100% | Live |
-| IN / OUT punches, 4-hour lock, repeated / mismatched punch checks | 10% | 0% | Needs S5 first (it runs in the new terminal path) |
+| IN / OUT punches, 4-hour lock, repeated / mismatched punch checks | 10% | 90% | **LIVE** (migration 007 on live, terminal v80+). Left: your phone test of the 4-hour lock, and your answer on what a punch after a finished OUT should do (today it starts a new IN) |
 | Shift management: Day / Night, assign labors, reports follow the shift | 20% | 0% | Not started |
 | Client (SaaS) management: platform-owner page | 10% | 0% | Not started |
-| Labor monthly attendance on the terminal | 5% | 0% | Not started |
+| Labor monthly attendance on the terminal | 5% | 90% | Built and tested on staging (migration 008, current + previous month); goes live with the 008 step on live |
 | Roadmap, schema files, automatic tests | 5% | 100% | Maintained every step |
 
 Rough number of remaining steps (each step = one exchange with you): S5 live cutover 3-4, IN/OUT + lock 2-3, Shift management 4-5, Platform-owner page 2-3, Monthly view 1-2.
@@ -31,9 +31,11 @@ Why S5 comes before IN/OUT and the lock: those rules live in the new terminal pa
 
 ---
 
-## NOW - next: IN / OUT punches and the 4-hour lock
+## NOW - next: apply 008 on live, then Day / Night shift management
 
-S5 is done and live. Needed from the owner before building: the exact rule for punches after the lock (see section E, question 24a).
+1. Owner: run migration 008 on the LIVE project (one paste), then test "View my attendance" on a phone.
+2. Then: Shift management (Day + Night definitions, assign labors, move between shifts, reports follow the shift, fix findings 48 and 52).
+3. Then: platform-owner (client management) page.
 
 ---
 
@@ -221,6 +223,7 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 
 | Date | Change |
 |------|--------|
+| 2026-10-02 | **Monthly attendance on the terminal built (v82):** migration 008 `terminal_month_attendance` (current + previous month only, no salary / ID / overtime amount), month screen in the new dark look (calendar with P / H / A / O letters, totals, day punches, 1-minute idle close; closing brings the punch screen back). 11 database checks + 6 end-to-end tests pass on staging; punch-ui 9, layout 10, session 3, terminal 13. Overtime is not shown (money table). Progress about 68%. |
 | 2026-10-02 | **Bug fixed (v81):** the punch terminal and the administrator shared one saved login in the browser, so opening the terminal link replaced the admin session and the admin lists were empty. The terminal now keeps its own saved session; an old terminal session on an admin page sends the user to the login page. Test `tests/session-isolation.test.js` (fails on the old code, passes now). Also live: migration 007 (IN/OUT rules, 4-hour lock) applied by the owner, v80 terminal. |
 | 2026-10-02 | New punch terminal look drafted (v78, branch only, NOT live): face + ID box (phone keyboard) + IN / OUT buttons, green IN / red bye-bye OUT / amber already-logged-in screens, 7-second auto close, hides the 4-hour rule from labors. 8 new end-to-end tests (`tests/punch-ui.test.js`) pass on staging; smoke 15, update 24, environment 5 pass. Design: https://claude.ai/artifact/S732jY4pMiZUcd84dPvLFW. Decided: ID typed each time (option C); monthly view = current + previous month. Supabase usage (live, 2026-10-02): storage 0.21 of 1 GB, database 48 MB of 500 MB, egress 0.54 GB of 5 GB. |
 | 2026-10-02 | **S5 LIVE CUTOVER DONE.** Live database locked down (other apps archived, AE2/AE3 and extra locations removed, supervisors inactive), new login live for every host (v77), terminal working with the new terminal key. Owner confirmed admin login, reports and punching. Progress about 54%. |
