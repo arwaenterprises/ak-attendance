@@ -39,9 +39,9 @@ Files: [plan](https://github.com/arwaenterprises/ak-attendance/blob/claude/cool-
 
 | # | I need from you | Answer |
 |---|----------|--------|
-| 1 | Admin username for AE1 (the one login, e.g. `admin`) | |
-| 2 | Number of punch terminals for AE1 | |
-| 3 | A quiet 30-60 minute window | |
+| 1 | Admin username for AE1 | **Answered:** `akhtaransari` (existing admin renamed) |
+| 2 | Number of punch terminals for AE1 | **Answered:** 1 main (Kaden Warehouse); Sulay to confirm |
+| 3 | A quiet window | **Answered:** 60-90 min fine; need the day/time |
 | 4 | Explicit OK on the plan | |
 
 ---

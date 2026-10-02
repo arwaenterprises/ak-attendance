@@ -21,5 +21,27 @@ Decision (owner): use the same live Supabase project, keep only the attendance a
 5. Test: admin login, dashboard, punch terminal on the terminal device (open `punch/?client=AE1#key=...`), photo shown.
 6. If anything is wrong: run the rollback SQL and I revert the app change.
 
-## Needed from you
-Admin username, number of terminals, quiet window, explicit OK.
+## Decided with the owner
+- AE1 admin: the existing admin `akhtar.ansari@ak.com.sa` becomes username `akhtaransari` (typed as AkhtarAnsari; the login ignores capitals). Same person, same history, new password set in Supabase Auth.
+- AE1 supervisors adel, hridoy, prodip (active) are retired; arif was already inactive.
+- Downtime accepted: 60-90 minutes.
+- Terminals: Kaden Warehouse is the main one (2073 punches in 30 days); Sulay (49) maybe. One terminal link per company, used on every device.
+- AE2 (Hadir, 1 laborer) and AE3 (0 laborers) each have one admin whose username is an email, so those two logins will NOT work after the cutover (no Auth accounts). Their data stays. Open question to the owner: give them short usernames too, or leave.
+
+## Exact statements for step 3 (live SQL editor, after the bundle)
+```sql
+-- rename first (the old username is an email and cannot be used in the new login address)
+update public.users set username = 'akhtaransari'
+ where username = 'akhtar.ansari@ak.com.sa' and client_id = (select id from public.clients where client_code = 'AE1');
+select public.link_admin_profile('AE1', 'akhtaransari');
+select public.link_terminal_profile('AE1');
+```
+Auth users to create first (Authentication > Users > Add user, tick auto-confirm): `akhtaransari@ae1.dawam.arwaenterprises.com` and `terminal@ae1.dawam.arwaenterprises.com`.
+
+## If rolling back
+After the rollback SQL also run:
+```sql
+update public.users set username = 'akhtar.ansari@ak.com.sa'
+ where username = 'akhtaransari' and client_id = (select id from public.clients where client_code = 'AE1');
+```
+(the old login's stored password check depends on the old username, so it must be put back).
