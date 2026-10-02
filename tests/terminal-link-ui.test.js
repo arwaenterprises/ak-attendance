@@ -53,7 +53,8 @@ const FIXED = 'test-terminal-key-1234';
     });
     let link2;
     await test('"Create a new link" gives a different link that works, and the old link stops working', async () => {
-      await page.click('#newBtn');
+      ok(await page.locator('#newBtn').isDisabled(), 'the button is locked until CHANGE is typed');
+      await page.click('#advanced summary'); await page.fill('#confirmWord', 'CHANGE'); await page.click('#newBtn');
       await page.waitForFunction((old) => document.getElementById('linkBox').value !== old, link1, { timeout: 20000 });
       link2 = await page.inputValue('#linkBox');
       ok(/#key=[A-Za-z0-9]{28}$/.test(link2), link2);

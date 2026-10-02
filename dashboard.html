@@ -94,12 +94,12 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="js/config/supabase.js?v=85"></script>
-    <script src="js/auth/auth.js?v=85"></script>
-    <script src="js/utils/date-utils.js?v=85"></script>
-    <script src="js/ui/sync-indicator.js?v=85"></script>
-    <script src="js/ui/toast.js?v=85"></script>
-    <script src="js/api/report-api.js?v=85"></script>
+    <script src="js/config/supabase.js?v=87"></script>
+    <script src="js/auth/auth.js?v=87"></script>
+    <script src="js/utils/date-utils.js?v=87"></script>
+    <script src="js/ui/sync-indicator.js?v=87"></script>
+    <script src="js/ui/toast.js?v=87"></script>
+    <script src="js/api/report-api.js?v=87"></script>
 
     <script>
         // Require login
@@ -112,12 +112,14 @@
 
         const session = AUTH.getSession();
         const isAdmin = session.role === 'admin';
+        const isOwner = session.role === 'super_admin';   // the platform owner: manages the client companies, sees no company's labor data
 
         // Set user info
         document.getElementById('userName').textContent = session.name;
-        document.getElementById('userInfo').textContent = `${session.name} (${isAdmin ? 'ADMIN' : 'SUPERVISOR'})`;
+        document.getElementById('userInfo').textContent = `${session.name} (${isOwner ? 'PLATFORM OWNER' : (isAdmin ? 'ADMIN' : 'SUPERVISOR')})`;
         
         const roleLabels = {
+            'super_admin': 'Platform owner - client management',
             'admin': 'Administrator - Full Access',
             'supervisor': 'Supervisor - Department Access'
         };
@@ -126,6 +128,16 @@
         // Render navigation tiles based on role
         function renderNavigationTiles() {
             const tiles = [];
+
+            // The platform owner only manages the client companies
+            if (isOwner) {
+                tiles.push({ title: 'Clients', desc: 'Create and manage client companies', icon: '🏢', link: 'admin/platform-clients.html', class: 'tile-purple' });
+                document.getElementById('navigationTiles').innerHTML = tiles.map(tile => `
+                    <div class="dashboard-tile ${tile.class}" onclick="location.href='${tile.link}'">
+                        <div class="icon">${tile.icon}</div><h3>${tile.title}</h3><p>${tile.desc}</p>
+                    </div>`).join('');
+                return;
+            }
 
             // Admin only tiles
             if (isAdmin) {
@@ -306,6 +318,6 @@
             }
         }
     </script>
-    <script src="js/ui/app-update.js?v=85"></script>
+    <script src="js/ui/app-update.js?v=87"></script>
 </body>
 </html>

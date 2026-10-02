@@ -40,6 +40,7 @@ jobs:
           node punch-month.test.js
           node shifts-ui.test.js
           node terminal-link-ui.test.js
+          node platform-ui.test.js
           node update.test.js
           node smoke.test.js
 
