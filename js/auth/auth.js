@@ -8,24 +8,9 @@ const AUTH = {
     // Default client ID (for backward compatibility)
     DEFAULT_CLIENT_ID: '00000000-0000-0000-0000-000000000001',
 
-    // Hash password using SHA-256 with username as salt
-    async hashPassword(username, password) {
-        const data = new TextEncoder().encode(username.toLowerCase() + ':' + password);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    },
-
-    // Check if a value is already a SHA-256 hash (64 hex characters)
-    isHashed(value) {
-        return /^[a-f0-9]{64}$/.test(value);
-    },
-
-    // Login: company code + username + password (unchanged for the person). Which system checks it depends on DAWAM_AUTH_MODE.
+    // Login: company code + username + password (checked by Supabase Auth)
     async login(clientCode, username, password) {
-        return DAWAM_AUTH_MODE === 'supabase'
-            ? this.loginSupabase(clientCode, username, password)
-            : this.loginLegacy(clientCode, username, password);
+        return this.loginSupabase(clientCode, username, password);
     },
 
     // New login (Supabase Auth). The database decides what this person may see (see supabase/migrations).
@@ -104,98 +89,6 @@ const AUTH = {
         }
     },
 
-    // Old login (kept for the live site until the cutover): reads the user table in the browser.
-    async loginLegacy(clientCode, username, password) {
-        try {
-            // First, find the client by code
-            const { data: clientData, error: clientError } = await supabaseClient
-                .from('clients')
-                .select('id, business_name, business_name_ar, logo_url, subscription_status, subscription_tier, subscription_end_date, is_active')
-                .eq('client_code', clientCode.toUpperCase().trim())
-                .single();
-
-            if (clientError || !clientData) {
-                return { success: false, error: 'Invalid client code' };
-            }
-
-            if (!clientData.is_active) {
-                return { success: false, error: 'This account has been deactivated. Contact support.' };
-            }
-
-            // Now find user belonging to this client
-            const { data: userData, error: userError } = await supabaseClient
-                .from('users')
-                .select('id, username, password_hash, name, role, department_id, status, client_id, permissions')
-                .eq('username', username.toLowerCase().trim())
-                .eq('client_id', clientData.id)
-                .eq('status', 'active')
-                .single();
-
-            if (userError || !userData) {
-                return { success: false, error: 'User not found for this client' };
-            }
-
-            // Support both hashed and plaintext passwords during migration
-            let passwordMatch = false;
-            if (this.isHashed(userData.password_hash)) {
-                const hashedInput = await this.hashPassword(username, password);
-                passwordMatch = hashedInput === userData.password_hash;
-            } else {
-                passwordMatch = userData.password_hash === password;
-            }
-
-            if (!passwordMatch) {
-                return { success: false, error: 'Invalid password' };
-            }
-
-            // Check subscription status
-            const subscriptionCheck = this.checkSubscriptionStatus(clientData);
-            if (!subscriptionCheck.valid) {
-                return { success: false, error: subscriptionCheck.message };
-            }
-
-            // Create session with client info
-            const session = {
-                userId: userData.id,
-                username: userData.username,
-                name: userData.name,
-                role: userData.role,
-                departmentId: userData.department_id,
-                permissions: userData.permissions || {},
-                clientId: clientData.id,
-                clientCode: clientCode.toUpperCase().trim(),
-                clientName: clientData.business_name,
-                clientNameAr: clientData.business_name_ar,
-                clientLogo: clientData.logo_url,
-                clientTier: clientData.subscription_tier,
-                clientStatus: clientData.subscription_status,
-                loginTime: new Date().toISOString()
-            };
-
-            localStorage.setItem(this.SESSION_KEY, JSON.stringify(session));
-            
-            // Store client info separately for easy access
-            localStorage.setItem('client_id', clientData.id);
-            localStorage.setItem('client_code', clientCode.toUpperCase().trim());
-            localStorage.setItem('client_name', clientData.business_name);
-            if (clientData.logo_url) {
-                localStorage.setItem('client_logo', clientData.logo_url);
-            }
-
-            // Audit log
-            await this.logAction('LOGIN', 'users', userData.id, null, { 
-                username: userData.username,
-                client_id: clientData.id,
-                client_code: clientCode
-            });
-
-            return { success: true, user: session };
-        } catch (error) {
-            console.error('Login error:', error);
-            return { success: false, error: 'Login failed. Check internet connection.' };
-        }
-    },
-
     // Check subscription status
     checkSubscriptionStatus(clientData) {
         const now = new Date();
@@ -239,9 +132,7 @@ const AUTH = {
         
         // New login: end this device's session only (other devices using the same login stay signed in)
         this._loggingOut = true;
-        if (DAWAM_AUTH_MODE === 'supabase') {
-            try { await supabaseClient.auth.signOut({ scope: 'local' }); } catch (e) { /* clear the screen copy anyway */ }
-        }
+        try { await supabaseClient.auth.signOut({ scope: 'local' }); } catch (e) { /* clear the screen copy anyway */ }
 
         // Clear all session data
         localStorage.removeItem(this.SESSION_KEY);
@@ -430,7 +321,7 @@ AUTH.endSessionAndGoToLogin = function () {
     localStorage.removeItem('client_logo');
     window.location.href = AUTH.getBasePath() + 'index.html';
 };
-if (DAWAM_AUTH_MODE === 'supabase') {
+{
     document.addEventListener('DOMContentLoaded', async function () {
         if (!AUTH.isLoggedIn()) return;
         try {

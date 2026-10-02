@@ -27,8 +27,8 @@ const GENERAL_ERROR = 'Invalid company code, username or password';
   // safety: staging only
   { const { ctx, page } = await open('/tests/harness.html');
     await page.waitForFunction(() => typeof SUPABASE_URL !== 'undefined');
-    const t = await page.evaluate(() => [SUPABASE_URL, DAWAM_AUTH_MODE]);
-    if (!t[0].includes('jbfdaeyqsszoacrijldk') || t[1] !== 'supabase') { console.error('REFUSING to run: not staging / not the new login: ' + t); process.exit(2); }
+    const t = await page.evaluate(() => SUPABASE_URL);
+    if (!t.includes('jbfdaeyqsszoacrijldk')) { console.error('REFUSING to run: not staging: ' + t); process.exit(2); }
     await ctx.close(); }
 
   console.log('Login screen');
@@ -93,12 +93,12 @@ const GENERAL_ERROR = 'Invalid company code, username or password';
     eq(await page.evaluate(() => localStorage.getItem('ak_attendance_session')), null, 'fake session removed');
     await ctx.close();
   });
-  await test('Users page is gone with the new login: no Users tile, the page sends you to the dashboard', async () => {
+  await test('Users page is gone: no Users tile and the page no longer exists', async () => {
     const { ctx, page } = await open('/index.html');
     await uiLogin(page, 'TEST', 'admin', 'Test@1234'); await page.waitForURL('**/dashboard.html', { timeout: 30000 });
     await page.waitForTimeout(1000);
     eq(await page.locator('text=Manage users').count(), 0, 'Users tile');
-    await page.goto(url + '/admin/users.html'); await page.waitForURL('**/dashboard.html', { timeout: 15000 });
+    const gone = await page.goto(url + '/admin/users.html'); ok(gone && gone.status() === 404, 'the old Users page must be gone, got ' + (gone && gone.status()));
     await ctx.close();
   });
 

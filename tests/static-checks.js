@@ -104,11 +104,11 @@ const modeCopies = [];
     if (['node_modules', '.git', 'tests', 'supabase', '_site', 'tools'].includes(e.name)) continue;
     const f = path.join(dir, e.name);
     if (e.isDirectory()) scan(f);
-    else if (/\.(html|js)$/.test(e.name) && /DAWAM_AUTH_MODE\s*=\s*[^;\n]*['"]legacy['"]/.test(fs.readFileSync(f, 'utf8'))) modeCopies.push(path.relative(ROOT, f));
+    else if (/\.(html|js)$/.test(e.name) && /DAWAM_AUTH_MODE/.test(fs.readFileSync(f, 'utf8'))) modeCopies.push(path.relative(ROOT, f));
   }
 })(ROOT);
-check("no page sets the login mode to 'legacy' (the old login is gone)", modeCopies.length === 0, modeCopies.join(', '));
-check('every host uses the new login (DAWAM_AUTH_MODE is supabase after the S5 cutover)', /DAWAM_AUTH_MODE\s*=\s*'supabase'/.test(supaJs));
+check("no page or script mentions DAWAM_AUTH_MODE (the old login mode switch is gone; a page with its own copy once broke self-enrollment on the live site)", modeCopies.length === 0, modeCopies.join(', '));
+check('the old login is gone: no file mentions DAWAM_AUTH_MODE any more', !/DAWAM_AUTH_MODE/.test(supaJs));
 
 // version must be bumped when app files changed (CI sets BASE_SHA)
 const base = process.env.BASE_SHA;

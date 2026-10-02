@@ -9,9 +9,6 @@ const SUPABASE_ANON_KEY = DAWAM_IS_STAGING
     ? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmRhZXlxc3N6b2FjcmlqbGRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA5NDg5OTksImV4cCI6MjEwNjUyNDk5OX0.h3Cb8TJfkppvpsmh65Zkb_0W0F3VxJf1O8ISpp7M5UA'
     : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt5a3R3endpcmFpcHd5Z2xraHZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwMTA2MTcsImV4cCI6MjA4NzU4NjYxN30.acOQWJkfE6Ew9PVyEKNeGxs7ri7QH_AarpPcoT34RBY';
 
-// Login system. Staging uses the new Supabase Auth login (ROADMAP security step S2); the live site keeps the old login
-// until the planned cutover (S5). One place to switch: change this line when the live database is ready.
-const DAWAM_AUTH_MODE = 'supabase';
 // Login email = <username>@<company code>.<this domain>. The app builds it; nothing is ever sent to it.
 // Must match supabase/migrations/002_auth_login.sql (checked by tests/static-checks.js).
 const DAWAM_LOGIN_EMAIL_DOMAIN = 'dawam.arwaenterprises.com';
@@ -32,18 +29,7 @@ const DAWAM_IS_TERMINAL_PAGE = /\/punch\//.test(location.pathname);
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY,
     DAWAM_IS_TERMINAL_PAGE ? { auth: { storageKey: 'dawam-terminal-auth' } } : undefined);
 
-// Test connection
+// Test connection: the public key may not read any table, so a table read is not a valid test; a failed sign-in reports network problems itself.
 async function testConnection() {
-    // New login: the public key may not read any table any more, so a table read is no longer a valid test.
-    // A failed sign-in reports network problems itself.
-    if (DAWAM_AUTH_MODE === 'supabase') return navigator.onLine !== false;
-    try {
-        const { data, error } = await supabaseClient.from('settings').select('key').limit(1);
-        if (error) throw error;
-        console.log('✅ Supabase connected successfully');
-        return true;
-    } catch (error) {
-        console.error('❌ Supabase connection failed:', error.message);
-        return false;
-    }
+    return navigator.onLine !== false;
 }

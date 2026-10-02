@@ -94,12 +94,12 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="js/config/supabase.js?v=89"></script>
-    <script src="js/auth/auth.js?v=89"></script>
-    <script src="js/utils/date-utils.js?v=89"></script>
-    <script src="js/ui/sync-indicator.js?v=89"></script>
-    <script src="js/ui/toast.js?v=89"></script>
-    <script src="js/api/report-api.js?v=89"></script>
+    <script src="js/config/supabase.js?v=90"></script>
+    <script src="js/auth/auth.js?v=90"></script>
+    <script src="js/utils/date-utils.js?v=90"></script>
+    <script src="js/ui/sync-indicator.js?v=90"></script>
+    <script src="js/ui/toast.js?v=90"></script>
+    <script src="js/api/report-api.js?v=90"></script>
 
     <script>
         // Require login
@@ -143,17 +143,11 @@
             if (isAdmin) {
                 tiles.push(
                     { title: 'Departments', desc: 'Manage departments', icon: '🏛️', link: 'admin/departments.html', class: 'tile-purple' },
-                    { title: 'Users', desc: 'Manage users', icon: '👤', link: 'admin/users.html', class: 'tile-pink' },
                     { title: 'Shifts', desc: 'Day / Night shifts and assignments', icon: '🌓', link: 'admin/shifts.html', class: 'tile-indigo' },
                     { title: 'Terminal Link', desc: 'Punch link and QR code for labors', icon: '🔗', link: 'admin/terminal-link.html', class: 'tile-green' },
                     { title: 'Punch Locations', desc: 'Manage locations', icon: '📍', link: 'attendance/punch-locations.html', class: 'tile-red' },
                     { title: 'Settings', desc: 'System settings', icon: '⚙️', link: 'admin/settings.html', class: 'tile-teal' }
                 );
-            }
-
-            // One admin per company: the Users page is gone with the new login
-            if (DAWAM_AUTH_MODE === 'supabase') {
-                for (let i = tiles.length - 1; i >= 0; i--) if (tiles[i].link === 'admin/users.html') tiles.splice(i, 1);
             }
 
             // Common tiles for Admin and Supervisor
@@ -318,6 +312,6 @@
             }
         }
     </script>
-    <script src="js/ui/app-update.js?v=89"></script>
+    <script src="js/ui/app-update.js?v=90"></script>
 </body>
 </html>

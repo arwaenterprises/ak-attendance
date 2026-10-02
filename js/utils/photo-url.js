@@ -10,7 +10,7 @@ const PhotoURL = {
     _cache: {},                          // path -> { url, until }
     TRANSPARENT: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
 
-    isPrivate() { return typeof DAWAM_AUTH_MODE !== 'undefined' && DAWAM_AUTH_MODE === 'supabase'; },
+    isPrivate() { return true; },                       // photos are always private (signed links)
 
     // the file path inside the bucket, from a stored value (path or old public web address)
     pathOf(ref) {
