@@ -40,21 +40,26 @@
                     </div>
                     <div id="qrBox" aria-label="QR code of the punch terminal link"></div>
                     <p class="hint" style="text-align:center">Labors can also scan this code with the phone camera.</p>
-                    <div class="danger-zone">
-                        <p class="hint">Lost the link or shared it by mistake? Make a new one. The old link stops working on every phone, so send the new link again.</p>
-                        <button type="button" class="btn btn-danger" id="newBtn" onclick="newLink()">Create a new link</button>
-                    </div>
+                    <p class="hint" style="text-align:center">This link stays the same for as long as you use the app. Labors never need a new one.</p>
+                    <details class="danger-zone" id="advanced">
+                        <summary class="hint" style="cursor:pointer">Advanced: the link was lost or shared with the wrong people</summary>
+                        <p class="hint" style="margin-top:10px">A new link replaces this one. <strong>The old link stops working on every phone</strong>, and each labor needs the new link once. Only do this in an emergency.</p>
+                        <div class="link-row">
+                            <input type="text" id="confirmWord" placeholder="Type CHANGE to unlock" autocomplete="off" aria-label="Type CHANGE to unlock the button" oninput="document.getElementById('newBtn').disabled = this.value.trim() !== 'CHANGE'">
+                            <button type="button" class="btn btn-danger" id="newBtn" disabled onclick="newLink()">Create a new link</button>
+                        </div>
+                    </details>
                 </div>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="../js/config/supabase.js?v=86"></script>
-    <script src="../js/auth/auth.js?v=86"></script>
-    <script src="../js/ui/sync-indicator.js?v=86"></script>
-    <script src="../js/ui/toast.js?v=86"></script>
-    <script src="../js/vendor/qrcode-generator.js?v=86"></script>
+    <script src="../js/config/supabase.js?v=87"></script>
+    <script src="../js/auth/auth.js?v=87"></script>
+    <script src="../js/ui/sync-indicator.js?v=87"></script>
+    <script src="../js/ui/toast.js?v=87"></script>
+    <script src="../js/vendor/qrcode-generator.js?v=87"></script>
 
     <script>
         if (!AUTH.requireRole(['admin'])) { /* redirect handled by requireRole */ }
@@ -96,11 +101,13 @@
         }
         function openLink() { window.open(currentLink, '_blank', 'noopener'); }
         async function newLink() {
+            if (document.getElementById('confirmWord').value.trim() !== 'CHANGE') return;
             if (!confirm('Create a new link?\n\nThe old link stops working on every phone. You will need to send the new link to your labors again.')) return;
             await load(true);
+            document.getElementById('confirmWord').value = ''; document.getElementById('newBtn').disabled = true; document.getElementById('advanced').open = false;
         }
         load(false);
     </script>
-    <script src="../js/ui/app-update.js?v=86"></script>
+    <script src="../js/ui/app-update.js?v=87"></script>
 </body>
 </html>
