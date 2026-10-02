@@ -7,7 +7,7 @@
 // It sets CACHE_VERSION below AND the ?v=N on every script tag of every page. The in-app
 // "new version available" check compares these two numbers, so they must always be equal
 // (tests/static-checks.js enforces it). Keep the CACHE_VERSION line exactly in this form.
-const CACHE_VERSION = 'dawam-attendance-v82';
+const CACHE_VERSION = 'dawam-attendance-v84';
 
 const OFFLINE_FALLBACK_PAGE = '/punch/index.html';
 
@@ -19,6 +19,7 @@ const APP_SHELL = [
   '/punch/index.html',
   '/admin/departments.html',
   '/admin/settings.html',
+  '/admin/shifts.html',
   '/admin/users.html',
   '/attendance/lop.html',
   '/attendance/overtime.html',
@@ -40,6 +41,7 @@ const APP_SHELL = [
   '/js/api/labor-api.js',
   '/js/api/lop-api.js',
   '/js/api/punch-api.js',
+  '/js/api/shift-api.js',
   '/js/api/report-api.js',
   '/js/api/terminal-api.js',
   '/js/api/user-api.js',

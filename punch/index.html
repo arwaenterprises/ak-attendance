@@ -201,6 +201,10 @@
         .status-details { font-size: 19px; line-height: 1.6; font-weight: 600; color: inherit; opacity: .92; }
         .status-details .who { font-size: 26px; font-weight: 800; display: block; }
         .status-details .chip { display: inline-block; background: rgba(255,255,255,0.12); border-radius: 999px; padding: 6px 14px; font-size: 16px; font-weight: 700; margin: 4px 3px 0; }
+        .status-actions { display: none; gap: 12px; margin-top: 18px; width: 100%; max-width: 420px; }
+        .status-actions.on { display: flex; }
+        .status-actions button { flex: 1; height: 72px; border: 0; border-radius: 18px; font-family: inherit; font-size: 22px; font-weight: 800; cursor: pointer; }
+        .status-actions .stay { background: #4ADE80; color: #052E16; } .status-actions .leave { background: #FBBF24; color: #3B2300; }
         .status-overlay.k-success { background: #06281A; color: #F0FDF4; } .k-success .status-icon { background: #4ADE80; }
         .status-overlay.k-out { background: #2B0A0F; color: #FFF1F2; } .k-out .status-icon { background: #FB7185; }
         .status-overlay.k-warn { background: #2A1B04; color: #FFFBEB; } .k-warn .status-icon { background: #FBBF24; }
@@ -574,6 +578,7 @@
             <div class="status-title" id="statusTitle">Success</div>
             <div class="status-time" id="statusTime">08:30</div>
             <div class="status-details" id="statusDetails"></div>
+            <div class="status-actions" id="statusActions"></div>
         </div>
 
         <!-- No Internet Warning -->
@@ -624,15 +629,15 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="../js/config/supabase.js?v=82"></script>
-    <script src="../js/utils/date-utils.js?v=82"></script>
-    <script src="../js/utils/photo-utils.js?v=82"></script>
-    <script src="../js/utils/offline-storage.js?v=82"></script>
-    <script src="../js/utils/sync-manager.js?v=82"></script>
-    <script src="../js/api/labor-api.js?v=82"></script>
-    <script src="../js/api/punch-api.js?v=82"></script>
-    <script src="../js/api/terminal-api.js?v=82"></script>
-    <script src="../js/utils/photo-url.js?v=82"></script>
+    <script src="../js/config/supabase.js?v=84"></script>
+    <script src="../js/utils/date-utils.js?v=84"></script>
+    <script src="../js/utils/photo-utils.js?v=84"></script>
+    <script src="../js/utils/offline-storage.js?v=84"></script>
+    <script src="../js/utils/sync-manager.js?v=84"></script>
+    <script src="../js/api/labor-api.js?v=84"></script>
+    <script src="../js/api/punch-api.js?v=84"></script>
+    <script src="../js/api/terminal-api.js?v=84"></script>
+    <script src="../js/utils/photo-url.js?v=84"></script>
 
     <script>
         // ============ ONE SCREEN, NO SCROLL ============
@@ -1172,6 +1177,7 @@ localStorage.setItem('pwa_client_code', clientCode);
                 // Ask the database first (it holds the IN / OUT rules). Offline or an older database: the page checks with what it knows.
                 let punchType;
                 let checked = false;
+                let shiftName = null;
                 if (DAWAM_AUTH_MODE === 'supabase' && !isOfflineMode && navigator.onLine) {
                     const chk = await TerminalAPI.checkPunch(currentLabor.labor_id, kind, DateUtils.today(), DateUtils.now());
                     if (chk.success) {
@@ -1180,6 +1186,12 @@ localStorage.setItem('pwa_client_code', clientCode);
                             showStatus('warn', chk.message || 'Punch not allowed', '', `<span class="who">${currentLabor.name}</span>This punch was not recorded.`);
                             scheduleReset(7000);
                             return;
+                        }
+                        shiftName = chk.shiftName || null;
+                        if (kind === 'logout' && chk.early) {
+                            const leave = await confirmEarlyLeave(currentLabor.name, chk.workedMinutes, chk.requiredMinutes, chk.remainingMinutes);
+                            if (!leave) { resetTerminal(); return; }     // Stay: nothing recorded, back to the start
+                            showStatus('info', 'Saving', '', 'Recording your punch...');
                         }
                     }
                 }
@@ -1239,6 +1251,7 @@ localStorage.setItem('pwa_client_code', clientCode);
                         scheduleReset(7000);
                         return;
                     }
+                    if (saveResult.success && saveResult.data && saveResult.data.shift_name) shiftName = saveResult.data.shift_name;
                     if (!saveResult.success) {
                         punchData.photoBlob = photoBlob;
                         await OfflineStorage.savePunch(punchData);
@@ -1248,7 +1261,7 @@ localStorage.setItem('pwa_client_code', clientCode);
 
                 // Success
                 const timeStr = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
-                const chips = `<span class="chip">${currentLocation.name}</span>`;
+                const chips = (shiftName ? `<span class="chip">${esc(shiftName)}</span>` : '') + `<span class="chip">${esc(currentLocation.name)}</span>`;
 
                 if (punchType === 'logout') {
                     speak(`Goodbye, ${currentLabor.name}`);
@@ -1286,6 +1299,22 @@ localStorage.setItem('pwa_client_code', clientCode);
             document.getElementById('statusDetails').innerHTML = details;
             const ov = document.getElementById('statusOverlay');
             ov.className = 'status-overlay k-' + k + ' active';
+        }
+
+        const fmtMin = (m) => { m = Math.max(0, Math.round(Number(m) || 0)); return Math.floor(m / 60) + 'h ' + String(m % 60).padStart(2, '0') + 'm'; };
+        // "Leaving early?": resolves true = leave now, false = stay (also when nobody touches it for 20 seconds)
+        function confirmEarlyLeave(name, workedMin, requiredMin, remainingMin) {
+            return new Promise((resolve) => {
+                showStatus('warn', 'Leaving early?', '', `<span class="who">${esc(name)}</span>You have worked ${fmtMin(workedMin)} of ${fmtMin(requiredMin)}.<br>${fmtMin(remainingMin)} remaining.`);
+                const box = document.getElementById('statusActions');
+                box.innerHTML = '<button type="button" class="stay" id="earlyStay">Stay</button><button type="button" class="leave" id="earlyLeave">Leave now</button>';
+                box.classList.add('on');
+                let done = false;
+                const finish = (leave) => { if (done) return; done = true; clearTimeout(timer); box.classList.remove('on'); box.innerHTML = ''; resolve(leave); };
+                const timer = setTimeout(() => finish(false), 20000);
+                document.getElementById('earlyStay').onclick = () => finish(false);
+                document.getElementById('earlyLeave').onclick = () => finish(true);
+            });
         }
 
         function setPunchButtons(enabled) {
@@ -1690,7 +1719,7 @@ localStorage.setItem('pwa_client_code', clientCode);
             updateLocationBar('Offline mode - Punches will sync later', true);
         });
     </script>
-    <script src="../js/ui/app-update.js?v=82"></script>
-    <script src="../js/ui/pwa-install.js?v=82"></script>
+    <script src="../js/ui/app-update.js?v=84"></script>
+    <script src="../js/ui/pwa-install.js?v=84"></script>
 </body>
 </html>
