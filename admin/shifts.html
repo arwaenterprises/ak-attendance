@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dawam Attendance - Shift Management</title>
+    <link rel="stylesheet" href="../css/main.css">
+    <style>
+        .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+        .tab-btn { padding: 10px 20px; border: 0; border-radius: 10px; background: #edf2f7; color: #2d3748; font-weight: 700; cursor: pointer; font-size: 15px; }
+        .tab-btn.active { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; }
+        .tab-panel { display: none; } .tab-panel.active { display: block; }
+        .shift-night { background: #2d3748; color: #fff; } .shift-day { background: #fefcbf; color: #744210; }
+        .badge-shift { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; }
+        .move-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 12px 0; }
+        .move-bar select, .move-bar input[type=date] { padding: 8px 10px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 14px; }
+        .hint { color: #718096; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌓 Shift Management</h1>
+            <div class="header-actions">
+                <button type="button" class="btn btn-secondary" onclick="location.href='../dashboard.html'">← Dashboard</button>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="tabs">
+                <button type="button" class="tab-btn active" id="tabBtnShifts" onclick="showTab('Shifts')">Shifts</button>
+                <button type="button" class="tab-btn" id="tabBtnAssign" onclick="showTab('Assign')">Assign labors</button>
+                <button type="button" class="tab-btn" id="tabBtnHistory" onclick="showTab('History')">History</button>
+            </div>
+
+            <!-- Shifts -->
+            <div class="tab-panel active" id="tabShifts">
+                <p class="hint">Every labor works the Day or the Night shift. Reports show the shift of each day. Night punches that finish after midnight still belong to the evening they started (that detection is set in Settings).</p>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>Shift</th><th>Time</th><th>Required hours</th><th>Labors</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody id="shiftTable"><tr><td colspan="6" class="text-center p-20">Loading...</td></tr></tbody>
+                    </table>
+                </div>
+                <p class="hint">Required hours: the hours a labor should work in this shift. Leave empty to use the department's full-day hours.</p>
+            </div>
+
+            <!-- Assign -->
+            <div class="tab-panel" id="tabAssign">
+                <div class="move-bar">
+                    <strong id="selectedCount">0 selected</strong>
+                    <span>Move to</span>
+                    <select id="moveShift"></select>
+                    <span>from</span>
+                    <input type="date" id="moveDate">
+                    <button type="button" class="btn btn-primary" id="moveBtn" onclick="moveSelected()">Move selected</button>
+                    <span class="hint">A move dated today or earlier changes the shown shift on those days in reports.</span>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width:40px"><input type="checkbox" id="selectAll" onchange="toggleAll(this.checked)" aria-label="Select all shown labors"></th>
+                                <th>Labor ID</th><th>Name</th><th>Department</th><th>Shift</th>
+                            </tr>
+                            <tr class="filter-row">
+                                <th></th>
+                                <th><input type="text" class="col-filter" id="fId" placeholder="Search..." onkeyup="renderLabors()"></th>
+                                <th><input type="text" class="col-filter" id="fName" placeholder="Search..." onkeyup="renderLabors()"></th>
+                                <th><select class="col-filter" id="fDept" onchange="renderLabors()"><option value="">All</option></select></th>
+                                <th><select class="col-filter" id="fShift" onchange="renderLabors()"><option value="">All</option></select></th>
+                            </tr>
+                        </thead>
+                        <tbody id="laborTable"><tr><td colspan="5" class="text-center p-20">Loading...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- History -->
+            <div class="tab-panel" id="tabHistory">
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>From date</th><th>Labor</th><th>Moved to</th><th>Recorded</th></tr></thead>
+                        <tbody id="historyTable"><tr><td colspan="4" class="text-center p-20">Loading...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit shift -->
+    <div class="modal-overlay" id="shiftModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="modalTitle">Edit shift</h2>
+                <button type="button" class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editId">
+                <div class="form-group"><label>Name *</label><input type="text" id="shiftName" class="form-control" maxlength="60"></div>
+                <div class="form-row">
+                    <div class="form-group"><label>Starts *</label><input type="time" id="shiftStart" class="form-control"></div>
+                    <div class="form-group"><label>Ends *</label><input type="time" id="shiftEnd" class="form-control"></div>
+                </div>
+                <div class="form-group">
+                    <label>Required hours (optional)</label>
+                    <input type="number" id="shiftHours" class="form-control" min="1" max="24" step="0.5" placeholder="e.g. 10">
+                    <small class="hint">Empty = use the department's full-day hours.</small>
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="shiftStatus" class="form-control"><option value="active">Active</option><option value="inactive">Inactive</option></select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveShift()">💾 Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- App Scripts -->
+    <script src="../js/config/supabase.js?v=83"></script>
+    <script src="../js/auth/auth.js?v=83"></script>
+    <script src="../js/utils/date-utils.js?v=83"></script>
+    <script src="../js/ui/sync-indicator.js?v=83"></script>
+    <script src="../js/ui/toast.js?v=83"></script>
+    <script src="../js/api/shift-api.js?v=83"></script>
+
+    <script>
+        if (!AUTH.requireRole(['admin'])) { /* redirect handled by requireRole */ }
+
+        let shifts = [], labors = [], selected = new Set();
+        const esc = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const hhmm = (t) => (t || '').substring(0, 5);
+        const shiftById = (id) => shifts.find(s => s.id === id);
+        function shiftBadge(id) {
+            const s = shiftById(id) || shifts.find(x => !x.is_night);   // a labor without a shift counts as Day
+            if (!s) return '-';
+            return `<span class="badge-shift ${s.is_night ? 'shift-night' : 'shift-day'}">${esc(s.name)}</span>`;
+        }
+        function todayStr() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+
+        function showTab(name) {
+            ['Shifts', 'Assign', 'History'].forEach(n => {
+                document.getElementById('tab' + n).classList.toggle('active', n === name);
+                document.getElementById('tabBtn' + n).classList.toggle('active', n === name);
+            });
+            if (name === 'History') loadHistory();
+        }
+
+        // ---------- shifts ----------
+        function laborCount(shiftId) {
+            const day = shifts.find(s => !s.is_night);
+            return labors.filter(l => (l.shift_id || (day && day.id)) === shiftId).length;
+        }
+        function renderShifts() {
+            const tb = document.getElementById('shiftTable');
+            if (!shifts.length) { tb.innerHTML = '<tr><td colspan="6" class="text-center p-20 text-muted">No shifts found.</td></tr>'; return; }
+            tb.innerHTML = shifts.map(s => `
+                <tr>
+                    <td>${shiftBadge(s.id)}</td>
+                    <td><strong>${esc(hhmm(s.start_time))} – ${esc(hhmm(s.end_time))}</strong></td>
+                    <td>${s.required_hours != null ? esc(s.required_hours) + ' h' : '<span class="text-muted">Department default</span>'}</td>
+                    <td>${laborCount(s.id)}</td>
+                    <td><span class="badge badge-${s.status === 'active' ? 'active' : 'inactive'}">${esc(s.status)}</span></td>
+                    <td><button type="button" class="btn btn-sm btn-primary" onclick="editShift('${esc(s.id)}')">✏️ Edit</button></td>
+                </tr>`).join('');
+        }
+        function editShift(id) {
+            const s = shiftById(id); if (!s) return;
+            document.getElementById('modalTitle').textContent = 'Edit ' + s.name;
+            document.getElementById('editId').value = s.id;
+            document.getElementById('shiftName').value = s.name;
+            document.getElementById('shiftStart').value = hhmm(s.start_time);
+            document.getElementById('shiftEnd').value = hhmm(s.end_time);
+            document.getElementById('shiftHours').value = s.required_hours != null ? s.required_hours : '';
+            document.getElementById('shiftStatus').value = s.status;
+            document.getElementById('shiftModal').classList.add('active');
+        }
+        function closeModal() { document.getElementById('shiftModal').classList.remove('active'); }
+        async function saveShift() {
+            const id = document.getElementById('editId').value, s = shiftById(id);
+            const name = document.getElementById('shiftName').value.trim();
+            const start = document.getElementById('shiftStart').value, end = document.getElementById('shiftEnd').value;
+            const hoursRaw = document.getElementById('shiftHours').value.trim();
+            const status = document.getElementById('shiftStatus').value;
+            if (!name || !start || !end) { Toast.error('Please fill name, start and end'); return; }
+            if (hoursRaw && (Number(hoursRaw) <= 0 || Number(hoursRaw) > 24)) { Toast.error('Required hours must be between 1 and 24'); return; }
+            if (status === 'inactive' && s && laborCount(s.id) > 0) { Toast.error('Move the labors of this shift to the other shift first'); return; }
+            try {
+                SyncIndicator.show('Saving...');
+                const r = await ShiftAPI.update(id, { name, start_time: start, end_time: end, required_hours: hoursRaw ? Number(hoursRaw) : null, status });
+                SyncIndicator.hide();
+                if (!r.success) throw new Error(r.error);
+                Toast.success('Shift saved');
+                closeModal();
+                await loadAll();
+            } catch (e) { SyncIndicator.hide(); Toast.error('Failed to save: ' + e.message); }
+        }
+
+        // ---------- assign labors ----------
+        function fillSelectors() {
+            const active = shifts.filter(s => s.status === 'active');
+            document.getElementById('moveShift').innerHTML = active.map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
+            const fs = document.getElementById('fShift'), keep = fs.value;
+            fs.innerHTML = '<option value="">All</option>' + shifts.map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
+            fs.value = keep;
+            const depts = [...new Map(labors.filter(l => l.departments).map(l => [l.departments.id, l.departments.name])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
+            const fd = document.getElementById('fDept'), keepD = fd.value;
+            fd.innerHTML = '<option value="">All</option>' + depts.map(([id, n]) => `<option value="${esc(id)}">${esc(n)}</option>`).join('');
+            fd.value = keepD;
+        }
+        function visibleLabors() {
+            const id = document.getElementById('fId').value.toLowerCase(), nm = document.getElementById('fName').value.toLowerCase();
+            const dp = document.getElementById('fDept').value, sh = document.getElementById('fShift').value;
+            const day = shifts.find(s => !s.is_night);
+            return labors.filter(l => (!id || l.labor_id.toLowerCase().includes(id)) && (!nm || (l.name || '').toLowerCase().includes(nm)) &&
+                (!dp || l.department_id === dp) && (!sh || (l.shift_id || (day && day.id)) === sh));
+        }
+        function renderLabors() {
+            const rows = visibleLabors(), tb = document.getElementById('laborTable');
+            if (!rows.length) { tb.innerHTML = '<tr><td colspan="5" class="text-center p-20 text-muted">No labors found.</td></tr>'; updateCount(); return; }
+            tb.innerHTML = rows.map(l => `
+                <tr>
+                    <td><input type="checkbox" data-id="${esc(l.labor_id)}" ${selected.has(l.labor_id) ? 'checked' : ''} onchange="toggleOne(this)" aria-label="Select ${esc(l.labor_id)}"></td>
+                    <td><strong>${esc(l.labor_id)}</strong></td><td>${esc(l.name)}</td><td>${esc(l.departments ? l.departments.name : '-')}</td><td>${shiftBadge(l.shift_id)}</td>
+                </tr>`).join('');
+            document.getElementById('selectAll').checked = rows.every(l => selected.has(l.labor_id));
+            updateCount();
+        }
+        function toggleOne(cb) { cb.checked ? selected.add(cb.dataset.id) : selected.delete(cb.dataset.id); document.getElementById('selectAll').checked = visibleLabors().every(l => selected.has(l.labor_id)); updateCount(); }
+        function toggleAll(on) { visibleLabors().forEach(l => on ? selected.add(l.labor_id) : selected.delete(l.labor_id)); renderLabors(); }
+        function updateCount() {
+            document.getElementById('selectedCount').textContent = selected.size + ' selected';
+            document.getElementById('moveBtn').disabled = selected.size === 0;
+        }
+        async function moveSelected() {
+            const ids = [...selected], shiftId = document.getElementById('moveShift').value, from = document.getElementById('moveDate').value;
+            if (!ids.length) { Toast.error('Select at least one labor'); return; }
+            if (!shiftId || !from) { Toast.error('Choose the shift and the date'); return; }
+            const s = shiftById(shiftId);
+            if (!confirm(`Move ${ids.length} labor${ids.length > 1 ? 's' : ''} to ${s ? s.name : 'the shift'} from ${from}?`)) return;
+            try {
+                SyncIndicator.show('Moving...');
+                const r = await ShiftAPI.assign(ids, shiftId, from);
+                SyncIndicator.hide();
+                if (!r.success) throw new Error(r.error);
+                Toast.success(`Moved ${ids.length} labor${ids.length > 1 ? 's' : ''}`);
+                selected.clear();
+                await loadAll();
+            } catch (e) { SyncIndicator.hide(); Toast.error('Could not move: ' + e.message); }
+        }
+
+        // ---------- history ----------
+        async function loadHistory() {
+            const tb = document.getElementById('historyTable');
+            const r = await ShiftAPI.history(100);
+            if (!r.success) { tb.innerHTML = '<tr><td colspan="4" class="text-center p-20 text-danger">Failed to load.</td></tr>'; return; }
+            if (!r.data.length) { tb.innerHTML = '<tr><td colspan="4" class="text-center p-20 text-muted">No moves yet.</td></tr>'; return; }
+            const name = (id) => { const l = labors.find(x => x.labor_id === id); return l ? esc(l.name) : ''; };
+            tb.innerHTML = r.data.map(h => `<tr><td>${esc(DateUtils.formatDate(h.from_date))}</td><td><strong>${esc(h.labor_id)}</strong> ${name(h.labor_id)}</td><td>${shiftBadge(h.shift_id)}</td><td>${esc(DateUtils.formatDate(h.created_at))}</td></tr>`).join('');
+        }
+
+        async function loadAll() {
+            try {
+                SyncIndicator.show('Loading shifts...');
+                const [s, l] = await Promise.all([ShiftAPI.getAll(), ShiftAPI.getLabors()]);
+                SyncIndicator.hide();
+                if (!s.success) throw new Error(s.error);
+                if (!l.success) throw new Error(l.error);
+                shifts = s.data; labors = l.data;
+                fillSelectors(); renderShifts(); renderLabors();
+            } catch (e) {
+                SyncIndicator.hide();
+                Toast.error('Failed to load: ' + e.message);
+                document.getElementById('shiftTable').innerHTML = '<tr><td colspan="6" class="text-center p-20 text-danger">Failed to load. Check internet connection.</td></tr>';
+            }
+        }
+        document.getElementById('moveDate').value = todayStr();
+        loadAll();
+    </script>
+    <script src="../js/ui/app-update.js?v=83"></script>
+</body>
+</html>

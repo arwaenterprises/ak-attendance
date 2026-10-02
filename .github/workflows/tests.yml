@@ -38,6 +38,7 @@ jobs:
           node punch-layout.test.js
           node session-isolation.test.js
           node punch-month.test.js
+          node shifts-ui.test.js
           node update.test.js
           node smoke.test.js
 
