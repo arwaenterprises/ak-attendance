@@ -26,7 +26,11 @@ if (DAWAM_IS_STAGING) {
     });
 }
 
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// The punch terminal and the administrator are different logins on the SAME website, so their saved sessions must not share one place:
+// otherwise opening the terminal link in the administrator's browser replaced the administrator's session and every list came back empty.
+const DAWAM_IS_TERMINAL_PAGE = /\/punch\//.test(location.pathname);
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY,
+    DAWAM_IS_TERMINAL_PAGE ? { auth: { storageKey: 'dawam-terminal-auth' } } : undefined);
 
 // Test connection
 async function testConnection() {

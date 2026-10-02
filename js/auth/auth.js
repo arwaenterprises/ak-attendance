@@ -436,6 +436,11 @@ if (DAWAM_AUTH_MODE === 'supabase') {
         try {
             const { data } = await supabaseClient.auth.getSession();
             if (!data || !data.session) AUTH.endSessionAndGoToLogin();
+            // a saved TERMINAL login (left by an older version that shared the saved session) is not an administrator: sign in again
+            else if (/^terminal@/i.test(data.session.user.email || '')) {
+                await supabaseClient.auth.signOut({ scope: 'local' });
+                AUTH.endSessionAndGoToLogin();
+            }
         } catch (e) { /* offline: keep working; the next online request refreshes or ends the session */ }
     });
     supabaseClient.auth.onAuthStateChange(function (event) {
