@@ -436,5 +436,5 @@ create trigger update_lop_requests_updated_at    before update on public.lop_req
 -- ============================================================
 -- Changelog
 -- 2026-10-02  v0  Baseline from live export. Not yet run on any project.
---                 Hand-converted from the export: not tested. Run on the NEW project first and tell me any error.
+--                 Hand-converted from the export. Ran without errors on a local Postgres 16; not yet run on real Supabase - run on the NEW project first and tell me any error.
 -- ============================================================
