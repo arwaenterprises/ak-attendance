@@ -1,4 +1,4 @@
-// AK Attendance - Report API v7 (sandwich rule block fix + cross-month + per-client toggles)
+// Dawam Attendance - Report API v7 (sandwich rule block fix + cross-month + per-client toggles)
 const ReportAPI = {
     // Get daily attendance summary (original - only punched laborers)
     async getDailyAttendance(fromDate, toDate, departmentId = null) {

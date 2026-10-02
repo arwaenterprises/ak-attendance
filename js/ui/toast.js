@@ -1,4 +1,4 @@
-// AK Attendance - Toast Notifications
+// Dawam Attendance - Toast Notifications
 const Toast = {
     container: null,
 

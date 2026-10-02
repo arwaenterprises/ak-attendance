@@ -1,4 +1,4 @@
-// AK Attendance - Photo Utilities
+// Dawam Attendance - Photo Utilities
 const PhotoUtils = {
     // Resize image to 640x480 and return as Blob
     async resizeImage(canvas, maxWidth = 640, maxHeight = 480) {

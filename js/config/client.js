@@ -3,19 +3,19 @@
 // Multi-client support functions
 // ============================================
 
-// AK Company ID (your existing client)
-const AK_CLIENT_ID = '00000000-0000-0000-0000-000000000001';
+// Default client ID (the built-in first client)
+const DEFAULT_CLIENT_ID = '00000000-0000-0000-0000-000000000001';
 
 // Get current client ID from localStorage
 function getClientId() {
-    return localStorage.getItem('client_id') || AK_CLIENT_ID;
+    return localStorage.getItem('client_id') || DEFAULT_CLIENT_ID;
 }
 
 // Get current client info
 function getClientInfo() {
     return {
-        id: localStorage.getItem('client_id') || AK_CLIENT_ID,
-        name: localStorage.getItem('client_name') || 'M.A. Al Abdul Karim & Co',
+        id: localStorage.getItem('client_id') || DEFAULT_CLIENT_ID,
+        name: localStorage.getItem('client_name') || 'Dawam Attendance',
         logo: localStorage.getItem('client_logo') || null
     };
 }
@@ -75,5 +75,5 @@ window.ClientHelper = {
     setClientInfo,
     clearClientInfo,
     checkTrialStatus,
-    AK_CLIENT_ID
+    DEFAULT_CLIENT_ID
 };

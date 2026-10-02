@@ -1,4 +1,4 @@
-// AK Attendance - Date Utilities
+// Dawam Attendance - Date Utilities
 const DateUtils = {
     // Format date as DD/MM/YYYY
     formatDate(date) {

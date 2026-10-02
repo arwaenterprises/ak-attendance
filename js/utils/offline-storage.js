@@ -1,5 +1,6 @@
-// AK Attendance - Offline Storage (IndexedDB)
+// Dawam Attendance - Offline Storage (IndexedDB)
 const OfflineStorage = {
+    // Internal database name kept as-is on purpose: renaming it would orphan punches waiting to sync. Not visible to users.
     DB_NAME: 'AKAttendanceDB',
     DB_VERSION: 1,
     db: null,

@@ -14,10 +14,10 @@ Rule for every task: do not break the existing workflow or architecture; test be
 
 | Step | What you do | Done? |
 |------|-------------|-------|
-| 1-6 | Staging project set up, tests written, update mechanism built | Yes |
-| 7 | Nothing yet. I am doing the rename to "Dawam Attendance" (task 12) next, then I will ask you one question before touching the live site | - |
+| 7 | If the Super Admin password `AK@2026` (user `akhtar`) is, or ever was, used on the LIVE app: change it. Tell me if this repository is public | No |
+| 8 | Decide: may I merge this work into the live site now (the update mechanism needs to be live before it can update anyone), or do you want to test it on a real phone first? | No |
 
-Only these steps are yours right now. Everything else is mine until I ask.
+Everything else is mine until I ask.
 
 ---
 
@@ -69,7 +69,7 @@ Only these steps are yours right now. Everything else is mine until I ask.
 
 | # | Task | Severity | Status |
 |---|------|----------|--------|
-| 12 | Rename "AK" to "Dawam Attendance" everywhere visible (30+ files, `AK_CLIENT_ID`, cache name, manifest, session key). Show the client's own name from the database instead of the hard-coded "M.A. Al Abdul Karim & Co" | Low | Todo |
+| 12 | Rename done: page titles, punch terminal logo, login page (was "HADIR"), enroll page text, code comments, README, manifest, cache name, `AK_CLIENT_ID` -> `DEFAULT_CLIENT_ID`; the hard-coded company name is gone. Kept on purpose (invisible; renaming would sign users out / orphan offline punches): `ak_attendance_session`, `AKAttendanceDB`. A static check fails if "AK" comes back. The GitHub repository is still called `ak-attendance` (your call to rename it; the website address does not depend on it) | Low | Done |
 | 13 | Remove User Management (`admin/users.html`, `js/api/user-api.js` use); keep the role/permission checks so nothing else breaks | Medium | Todo |
 | 14 | One admin per client; enforce in the database, not just the screen | Medium | Todo |
 | 15 | Test same admin login on 2+ devices at once | Medium | Todo |
@@ -153,6 +153,8 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 | 53 | **Online punches look failed.** In `PunchAPI.savePunch` the line `supabaseClient.rpc(...).catch(...)` raises "catch is not a function" (with the supabase-js version the CDN serves today) AFTER the punch is saved. The function then returns `success: false`, so the terminal saves the punch a second time offline; the duplicate is skipped later by the sync (same date and time). Side effects: daily attendance and the draft LOP check are NOT triggered online, only when the offline copy syncs. Proven by a test. Not certain it behaves the same on every device (the service worker may serve an older cached copy of the library): check live data | High | Todo (fix with tasks 20-24) |
 | 54 | **Do not rename storage names when removing "AK".** The offline database is called `AKAttendanceDB` and the login session key is `ak_attendance_session`. Renaming them would log everyone out and orphan punches waiting to sync. Rename only visible text, titles, the cache name and the manifest; migrate storage names later with a copy step (task 12) | Medium | Decided |
 
+| 55 | **README published a default Super Admin login** (username `akhtar`, a password). Removed from the README, but it stays in the repository history. If that password is still used anywhere, change it now. Also check whether this repository is public | High | Needs your action |
+
 ---
 
 ## D. Feedback and suggestions
@@ -181,6 +183,7 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 |------|--------|
 | 2026-10-02 | Roadmap created from the code review. No application code changed yet. |
 | 2026-10-02 | Owner ran schema.sql and policies-temporary-open.sql on the new project successfully. Added `supabase/seed-staging.sql`. |
+| 2026-10-02 | Rename to Dawam Attendance (task 12), version 72, static check against leftover AK names; README default login removed (finding 55). All suites pass: static, 16 baseline, 22 update, 15 smoke. |
 | 2026-10-02 | Update mechanism built: new service worker, `app-update.js`, `pwa-install.js`, icons, manifest, `tools/bump-version.js`, static checks, 22 update tests, 15 page smoke tests. Everything passes locally: static checks, 16 baseline, 22 update, 15 smoke. Version now 71. |
 | 2026-10-02 | Baseline tests written (16 pass on staging). They found 2 new bugs: findings 52, 53. CI workflow added, not yet run on GitHub. |
 | 2026-10-02 | Owner applied the clients policy; staging login test passes (dashboard reached on new project). Task 2e done. |

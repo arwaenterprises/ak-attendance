@@ -1,4 +1,4 @@
-// AK Attendance - Enrollment Link API
+// Dawam Attendance - Enrollment Link API
 const EnrollmentAPI = {
     // Generate random token
     generateToken() {

@@ -1,4 +1,4 @@
-// AK Attendance - Punch API
+// Dawam Attendance - Punch API
 const PunchAPI = {
     // ========== PUNCH LOCATIONS ==========
     

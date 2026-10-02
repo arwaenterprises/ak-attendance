@@ -1,4 +1,4 @@
-// AK Attendance - Department API
+// Dawam Attendance - Department API
 const DepartmentAPI = {
     // Get all departments
     async getAll() {

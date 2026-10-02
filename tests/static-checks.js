@@ -54,6 +54,20 @@ check('manifest has PNG icons 192x192 and 512x512', sizes.includes('192x192') &&
 const iconsMissing = (manifest.icons || []).filter(i => !fs.existsSync(path.join(ROOT, i.src.slice(1))));
 check('every manifest icon file exists', iconsMissing.length === 0, iconsMissing.map(i => i.src).join(', '));
 
+// the old "AK" name must not come back in visible text (internal storage names are allowed on purpose)
+const ALLOW = /ak_attendance_session|AKAttendanceDB/;
+const textFiles = [];
+(function walk(dir) { for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+  if (e.name.startsWith('.') || ['node_modules', 'tests', 'tools', 'supabase', 'icons'].includes(e.name)) continue;
+  const p = path.join(dir, e.name);
+  if (e.isDirectory()) walk(p); else if (/\.(html|js|css|json|md)$/.test(e.name) && e.name !== 'ROADMAP.md') textFiles.push(p);
+} })(ROOT);
+const akHits = [];
+for (const f of textFiles) fs.readFileSync(f, 'utf8').split(/\r?\n/).forEach((line, i) => {
+  if (/\bAK\b|AK_|Al Abdul Karim|\bHADIR\b/i.test(line) && !ALLOW.test(line)) akHits.push(`${path.relative(ROOT, f)}:${i + 1}: ${line.trim().slice(0, 70)}`);
+});
+check('no leftover "AK" / "Al Abdul Karim" / "HADIR" names in app files', akHits.length === 0, akHits.slice(0, 6).join('\n        '));
+
 // version must be bumped when app files changed (CI sets BASE_SHA)
 const base = process.env.BASE_SHA;
 if (base && !/^0+$/.test(base)) {

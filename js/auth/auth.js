@@ -1,11 +1,12 @@
-// AK Attendance - Authentication Module
+// Dawam Attendance - Authentication Module
 // Updated for Multi-Client Support (Arwa Enterprises SaaS)
 
 const AUTH = {
+    // Internal storage name kept as-is on purpose: renaming it would sign every user out. Not visible to users.
     SESSION_KEY: 'ak_attendance_session',
 
-    // Default AK Client ID (for backward compatibility)
-    AK_CLIENT_ID: '00000000-0000-0000-0000-000000000001',
+    // Default client ID (for backward compatibility)
+    DEFAULT_CLIENT_ID: '00000000-0000-0000-0000-000000000001',
 
     // Hash password using SHA-256 with username as salt
     async hashPassword(username, password) {
@@ -196,14 +197,14 @@ const AUTH = {
     // Get current client ID
     getClientId() {
         const session = this.getSession();
-        return session?.clientId || localStorage.getItem('client_id') || this.AK_CLIENT_ID;
+        return session?.clientId || localStorage.getItem('client_id') || this.DEFAULT_CLIENT_ID;
     },
 
     // Get current client info
     getClientInfo() {
         const session = this.getSession();
         return {
-            id: session?.clientId || localStorage.getItem('client_id') || this.AK_CLIENT_ID,
+            id: session?.clientId || localStorage.getItem('client_id') || this.DEFAULT_CLIENT_ID,
             name: session?.clientName || localStorage.getItem('client_name') || 'Company',
             nameAr: session?.clientNameAr || null,
             logo: session?.clientLogo || localStorage.getItem('client_logo') || null,
