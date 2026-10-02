@@ -348,8 +348,10 @@
         const SUPABASE_ANON_KEY = DAWAM_IS_STAGING
             ? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmRhZXlxc3N6b2FjcmlqbGRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA5NDg5OTksImV4cCI6MjEwNjUyNDk5OX0.h3Cb8TJfkppvpsmh65Zkb_0W0F3VxJf1O8ISpp7M5UA'
             : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt5a3R3endpcmFpcHd5Z2xraHZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwMTA2MTcsImV4cCI6MjA4NzU4NjYxN30.acOQWJkfE6Ew9PVyEKNeGxs7ri7QH_AarpPcoT34RBY';
+        // New login: this public page uses only enrollment_get / enrollment_submit and one photo upload (no table access). Same switch as js/config/supabase.js.
+        const DAWAM_AUTH_MODE = DAWAM_IS_STAGING ? 'supabase' : 'legacy';
         const { createClient } = supabase;
-        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
     </script>
 
     <script>
@@ -374,11 +376,30 @@
 
             // Validate token
             try {
-                const { data, error } = await supabaseClient
+                let data, error;
+                if (DAWAM_AUTH_MODE === 'supabase') {
+                    // New login: ask the database function (it shows nothing else and works only with a valid link)
+                    const res = await supabaseClient.rpc('enrollment_get', { p_token: token });
+                    if (res.error || !res.data) { showError('Failed to validate link. Please try again.'); return; }
+                    const r = res.data;
+                    if (!r.ok) {
+                        const reasons = {
+                            invalid: 'Invalid link. Please request a new enrollment link.',
+                            expired: 'This link has expired. Please request a new enrollment link.',
+                            submitted: 'This link has already been used. Your enrollment is pending approval.',
+                            approved: 'Your enrollment has already been approved.'
+                        };
+                        showError(reasons[r.reason] || 'This link is no longer valid.');
+                        return;
+                    }
+                    data = { id: r.id, labor_id: r.labor_id, labor_name: r.labor_name, client_id: r.client_id, expires_at: r.expires_at, status: 'pending' };
+                } else {
+                    ({ data, error } = await supabaseClient
     .from('enrollment_links')
     .select('*')
     .eq('token', token)
-    .single();
+    .single());
+                }
 
                 if (error || !data) {
                     showError('Invalid link. Please request a new enrollment link.');
@@ -619,6 +640,18 @@
                 const response = await fetch(capturedImage);
                 const blob = await response.blob();
 
+                // New login: one photo per link, in the company folder, named after the link; the database function stores the result
+                if (DAWAM_AUTH_MODE === 'supabase') {
+                    const path = `${tokenData.clientId}/enrollment/${tokenData.token}.jpg`;
+                    const up = await supabaseClient.storage.from('punch-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+                    if (up.error) throw up.error;
+                    const sub = await supabaseClient.rpc('enrollment_submit', { p_token: tokenData.token, p_descriptor: JSON.stringify(capturedDescriptor), p_photo_path: path });
+                    if (sub.error) throw sub.error;
+                    document.getElementById('submittingState').classList.add('hidden');
+                    document.getElementById('successState').classList.remove('hidden');
+                    return;
+                }
+
                 // Upload photo
                 const fileName = `enrollment/${tokenData.laborId}_${Date.now()}.jpg`;
                 const { data: uploadData, error: uploadError } = await supabaseClient.storage
@@ -665,6 +698,6 @@
             }
         }
     </script>
-    <script src="../js/ui/app-update.js?v=75"></script>
+    <script src="../js/ui/app-update.js?v=76"></script>
 </body>
 </html>

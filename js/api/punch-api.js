@@ -182,7 +182,9 @@ const PunchAPI = {
         try {
             const timestamp = Date.now();
             const fileName = `${laborId}_${timestamp}.jpg`;
-            const filePath = `punches/${fileName}`;
+            // New login: photos live in a folder per company (the database only lets a terminal write into its own)
+            const newLogin = typeof DAWAM_AUTH_MODE !== 'undefined' && DAWAM_AUTH_MODE === 'supabase';
+            const filePath = newLogin ? `${AUTH.getClientId()}/punches/${fileName}` : `punches/${fileName}`;
 
             const { data, error } = await supabaseClient.storage
                 .from('punch-photos')
@@ -193,7 +195,8 @@ const PunchAPI = {
 
             if (error) throw error;
 
-            // Get public URL
+            // New login: the stored value is the file path (shown later through a signed link); old login: the public web address
+            if (newLogin) return { success: true, url: filePath };
             const { data: urlData } = supabaseClient.storage
                 .from('punch-photos')
                 .getPublicUrl(filePath);
@@ -490,7 +493,7 @@ const PunchAPI = {
                 for (const punch of oldPunches) {
                     // Extract file path from URL
                     const url = punch.photo_url;
-                    const pathMatch = url.match(/punch-photos\/(.+)$/);
+                    const pathMatch = /^https?:/.test(url) ? url.match(/punch-photos\/(.+)$/) : [null, url];   // old web address or new file path
                     if (pathMatch) {
                         await supabaseClient.storage
                             .from('punch-photos')

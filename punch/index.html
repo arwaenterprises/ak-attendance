@@ -530,14 +530,15 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="../js/config/supabase.js?v=75"></script>
-    <script src="../js/utils/date-utils.js?v=75"></script>
-    <script src="../js/utils/photo-utils.js?v=75"></script>
-    <script src="../js/utils/offline-storage.js?v=75"></script>
-    <script src="../js/utils/sync-manager.js?v=75"></script>
-    <script src="../js/api/labor-api.js?v=75"></script>
-    <script src="../js/api/punch-api.js?v=75"></script>
-    <script src="../js/api/terminal-api.js?v=75"></script>
+    <script src="../js/config/supabase.js?v=76"></script>
+    <script src="../js/utils/date-utils.js?v=76"></script>
+    <script src="../js/utils/photo-utils.js?v=76"></script>
+    <script src="../js/utils/offline-storage.js?v=76"></script>
+    <script src="../js/utils/sync-manager.js?v=76"></script>
+    <script src="../js/api/labor-api.js?v=76"></script>
+    <script src="../js/api/punch-api.js?v=76"></script>
+    <script src="../js/api/terminal-api.js?v=76"></script>
+    <script src="../js/utils/photo-url.js?v=76"></script>
 
     <script>
         // ============ MULTI-CLIENT SaaS SUPPORT ============
@@ -1352,9 +1353,10 @@ localStorage.setItem('pwa_client_code', clientCode);
                                 <div class="time">${formatTime(p.time)}</div>
                                 <div class="location">📍 ${p.location_name || 'Unknown'}</div>
                             </div>
-                            ${p.photo_url ? `<img class="punch-photo" src="${p.photo_url}" onclick="openFullscreenPhoto('${p.photo_url}')" alt="Punch Photo">` : ''}
+                            ${p.photo_url ? `<img class="punch-photo" src="${PhotoURL.src(p.photo_url)}" data-photo="${p.photo_url}" onclick="openFullscreenPhoto('${p.photo_url}')" alt="Punch Photo">` : ''}
                         </div>`;
                     }).join('');
+                    PhotoURL.hydrate(listEl);
 
                     const { totalHours, stillIn } = calculateAttendance(punches);
 
@@ -1423,8 +1425,10 @@ localStorage.setItem('pwa_client_code', clientCode);
             document.getElementById('attendanceModal').classList.remove('active');
         }
 
-        function openFullscreenPhoto(url) {
-            document.getElementById('fullscreenImg').src = url;
+        async function openFullscreenPhoto(url) {
+            const shown = await PhotoURL.resolve(url);
+            if (!shown) return;
+            document.getElementById('fullscreenImg').src = shown;
             document.getElementById('fullscreenPhoto').classList.add('active');
         }
 
@@ -1454,7 +1458,7 @@ localStorage.setItem('pwa_client_code', clientCode);
             updateLocationBar('📴 Offline Mode - Punches will sync later', true);
         });
     </script>
-    <script src="../js/ui/app-update.js?v=75"></script>
-    <script src="../js/ui/pwa-install.js?v=75"></script>
+    <script src="../js/ui/app-update.js?v=76"></script>
+    <script src="../js/ui/pwa-install.js?v=76"></script>
 </body>
 </html>

@@ -1,13 +1,16 @@
 // Dawam Attendance - Enrollment Link API
 const EnrollmentAPI = {
     // Generate random token
+    // Strong random token (the link is the only secret protecting a labor's enrollment): crypto random, not Math.random
     generateToken() {
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        const bytes = new Uint8Array(48);
+        crypto.getRandomValues(bytes);
         let token = '';
-        for (let i = 0; i < 32; i++) {
-            token += chars.charAt(Math.floor(Math.random() * chars.length));
+        for (let i = 0; i < bytes.length && token.length < 32; i++) {
+            if (bytes[i] < 248) token += chars.charAt(bytes[i] % 62);     // 248 = 4 x 62: no bias
         }
-        return token;
+        return token.length === 32 ? token : this.generateToken();
     },
 
     // Create enrollment link for a labor
@@ -236,12 +239,18 @@ const EnrollmentAPI = {
             // 3. Delete photo from Supabase Storage
             if (enrollment.photo_url) {
                 try {
-                    const url = new URL(enrollment.photo_url);
-                    const pathParts = url.pathname.split('/storage/v1/object/public/punch-photos/');
-                    if (pathParts[1]) {
+                    // new login: the stored value is the file path; old login: a public web address
+                    let photoPath = null;
+                    if (/^https?:/.test(enrollment.photo_url)) {
+                        const url = new URL(enrollment.photo_url);
+                        photoPath = url.pathname.split('/storage/v1/object/public/punch-photos/')[1] || null;
+                    } else {
+                        photoPath = enrollment.photo_url;
+                    }
+                    if (photoPath) {
                         await supabaseClient.storage
                             .from('punch-photos')
-                            .remove([pathParts[1]]);
+                            .remove([photoPath]);
                     }
                 } catch (e) {
                     console.warn('Failed to delete enrollment photo from storage:', e);
