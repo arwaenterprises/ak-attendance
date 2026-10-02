@@ -82,15 +82,28 @@ const JPEG_B64 = require('fs').readFileSync(__dirname + '/photos.test.js', 'utf8
     eq(await page.inputValue('#laborIdInput'), '');
     ok(await page.locator('#inBtn').isEnabled(), 'buttons enabled again');
   });
+  await test('OUT right after the IN (less than 4 hours) is refused with "You have logged in for the day"; nothing new is stored', async () => {
+    await press('#outBtn', LABOR); await waitResult('k-warn');
+    const o = await ov(); ok(/logged in for the day/i.test(o.title) && !/4/.test(o.title + o.details), 'message must not mention the 4 hours: ' + JSON.stringify(o));
+    eq((await adminRows()).length, 1); await waitClosed();
+  });
   await test('IN again the same day: "You have logged in for the day", nothing new is recorded', async () => {
     await press('#inBtn', LABOR); await waitResult('k-warn');
     const o = await ov(); ok(/logged in for the day/i.test(o.title), JSON.stringify(o));
     eq((await adminRows()).length, 1); await waitClosed();
   });
-  await test('OUT is recorded: red "Punched OUT" screen with "Bye bye"; two records (login, logout)', async () => {
+  await test('OUT 5 hours after the IN is recorded: red "Punched OUT" screen with "Bye bye"; two records (login, logout)', async () => {
+    // move the stored IN back by 5 hours (as the administrator), as if the labor had been at work since then
+    const moved = await admin.evaluate(async (L) => {
+      const d = new Date(Date.now() - 5 * 3600 * 1000), p2 = n => String(n).padStart(2, '0');
+      const date = d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()), time = p2(d.getHours()) + ':' + p2(d.getMinutes()) + ':00';
+      const r = await supabaseClient.from('punch_records').update({ date, time }).eq('labor_id', L).select();
+      return { n: (r.data || []).length, err: r.error && r.error.message };
+    }, LABOR);
+    eq(moved.n, 1, JSON.stringify(moved));
     await press('#outBtn', LABOR); await waitResult('k-out');
     const o = await ov(); ok(/Punched OUT/.test(o.title) && /Bye bye/.test(o.details), JSON.stringify(o));
-    eq((await adminRows()).map(r => r.type), ['login', 'logout']); await waitClosed();
+    eq((await adminRows()).map(r => r.type).sort(), ['login', 'logout']); await waitClosed();
   });
   await test('an unknown ID shows a message under the ID box and starts nothing', async () => {
     await press('#inBtn', 'NOPE999');

@@ -106,7 +106,18 @@ const TerminalAPI = {
             location_id: punch.locationId || null, location_name: punch.locationName || null,
             confidence: punch.confidence == null ? null : Math.round(punch.confidence), photo_url: punch.photoUrl || null
         } });
-        return error ? { success: false, error: this._fail(error) } : { success: true, data };
+        if (error) return { success: false, error: this._fail(error) };
+        // the database refuses repeated / mismatched punches and the 4-hour lock: such a punch is NOT stored
+        if (data && data.rejected) return { success: false, rejected: true, code: data.code, error: data.message };
+        return { success: true, data };
+    },
+
+    // Ask the database whether this punch would be accepted (before the photo is taken, so a refused punch costs no storage).
+    // If the question cannot be asked (offline, older database), the page falls back to its own check.
+    async checkPunch(laborId, type, date, time) {
+        const { data, error } = await this._rpc('terminal_check_punch', { p_labor_id: laborId, p_type: type, p_date: date, p_time: time });
+        if (error || !data) return { success: false, error: error ? this._fail(error) : 'No answer' };
+        return { success: true, allowed: !!data.allowed, code: data.code || null, message: data.message || null };
     },
 
     async lowConfidence(laborId) {
