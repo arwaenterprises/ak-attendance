@@ -73,7 +73,7 @@ const JPEG_B64 = require('fs').readFileSync(__dirname + '/photos.test.js', 'utf8
   });
   await test('IN is recorded: green screen "Punched IN" with the name; one record', async () => {
     await press('#inBtn', LABOR); await waitResult('k-success');
-    const o = await ov(); ok(/Punched IN/.test(o.title) && /Terminal Test/.test(o.details), JSON.stringify(o));
+    const o = await ov(); ok(/Punched IN/.test(o.title) && /Terminal Test/.test(o.details) && /Day shift/.test(o.details), JSON.stringify(o));
     const rows = await adminRows(); eq(rows.map(r => r.type), ['login']);
   });
   await test('the result screen closes by itself after about 7 seconds and the ID box is cleared', async () => {
@@ -92,7 +92,7 @@ const JPEG_B64 = require('fs').readFileSync(__dirname + '/photos.test.js', 'utf8
     const o = await ov(); ok(/logged in for the day/i.test(o.title), JSON.stringify(o));
     eq((await adminRows()).length, 1); await waitClosed();
   });
-  await test('OUT 5 hours after the IN is recorded: red "Punched OUT" screen with "Bye bye"; two records (login, logout)', async () => {
+  await test('OUT 5 hours after the IN asks "Leaving early?"; Stay records nothing', async () => {
     // move the stored IN back by 5 hours (as the administrator), as if the labor had been at work since then
     const moved = await admin.evaluate(async (L) => {
       const d = new Date(Date.now() - 5 * 3600 * 1000), p2 = n => String(n).padStart(2, '0');
@@ -101,9 +101,20 @@ const JPEG_B64 = require('fs').readFileSync(__dirname + '/photos.test.js', 'utf8
       return { n: (r.data || []).length, err: r.error && r.error.message };
     }, LABOR);
     eq(moved.n, 1, JSON.stringify(moved));
-    await press('#outBtn', LABOR); await waitResult('k-out');
+    await press('#outBtn', LABOR); await waitResult('k-warn');
+    const o = await ov(); ok(/Leaving early/.test(o.title) && /5h 0\dm/.test(o.details) && /9h 30m/.test(o.details) && /4h/.test(o.details), JSON.stringify(o));
+    ok(await page.locator('#earlyStay').isVisible() && await page.locator('#earlyLeave').isVisible(), 'Stay and Leave now buttons');
+    await page.click('#earlyStay');
+    await waitClosed();
+    eq((await adminRows()).length, 1); eq(await page.inputValue('#laborIdInput'), '');
+  });
+  await test('OUT again and "Leave now": the red "Punched OUT" screen with "Bye bye"; the OUT is stored as an early leave', async () => {
+    await press('#outBtn', LABOR); await waitResult('k-warn'); await page.click('#earlyLeave');
+    await waitResult('k-out');
     const o = await ov(); ok(/Punched OUT/.test(o.title) && /Bye bye/.test(o.details), JSON.stringify(o));
-    eq((await adminRows()).map(r => r.type).sort(), ['login', 'logout']); await waitClosed();
+    eq((await adminRows()).map(r => r.type).sort(), ['login', 'logout']);
+    const flag = await admin.evaluate(async (L) => (await supabaseClient.from('punch_records').select('early_out, early_minutes').eq('labor_id', L).eq('type', 'logout').single()).data, LABOR);
+    ok(flag.early_out === true && flag.early_minutes > 200, JSON.stringify(flag)); await waitClosed();
   });
   await test('IN after the OUT the same day is refused: "You have already logged out for the day"; nothing new is stored', async () => {
     await press('#inBtn', LABOR); await waitResult('k-warn');

@@ -20,6 +20,9 @@ const LABOR = 'SHF' + rid;
   await page.fill('#clientCode', 'TEST'); await page.fill('#username', 'admin'); await page.fill('#password', 'Test@1234'); await page.click('#loginBtn');
   await page.waitForURL(/dashboard/, { timeout: 30000 });
 
+  // start from a known state (an earlier failed run may have left a shift switched off or with hours)
+  await page.evaluate(async () => { await supabaseClient.from('shifts').update({ status: 'active', required_hours: null }).eq('client_id', AUTH.getClientId()); });
+
   // a test labor
   const setup = await page.evaluate(async (L) => {
     const cid = AUTH.getClientId(), r = L.slice(3);
@@ -32,8 +35,8 @@ const LABOR = 'SHF' + rid;
   ok(setup.ok, 'setup: ' + JSON.stringify(setup));
 
   await test('the dashboard has a Shifts tile that opens Shift Management', async () => {
-    await page.waitForSelector('text=Shifts', { timeout: 15000 });
-    await page.click('a[href="admin/shifts.html"], [onclick*="admin/shifts.html"], text=Shifts');
+    await page.getByText('Shifts', { exact: true }).first().waitFor({ timeout: 15000 });
+    await page.getByText('Shifts', { exact: true }).first().click();
     await page.waitForURL(/admin\/shifts\.html/, { timeout: 15000 });
   });
   await test('the Shifts tab lists the Day and the Night shift with their times', async () => {

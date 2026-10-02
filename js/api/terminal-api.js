@@ -117,7 +117,8 @@ const TerminalAPI = {
     async checkPunch(laborId, type, date, time) {
         const { data, error } = await this._rpc('terminal_check_punch', { p_labor_id: laborId, p_type: type, p_date: date, p_time: time });
         if (error || !data) return { success: false, error: error ? this._fail(error) : 'No answer' };
-        return { success: true, allowed: !!data.allowed, code: data.code || null, message: data.message || null };
+        return { success: true, allowed: !!data.allowed, code: data.code || null, message: data.message || null, shiftName: data.shift_name || null,
+                 early: !!data.early, workedMinutes: data.worked_minutes, requiredMinutes: data.required_minutes, remainingMinutes: data.remaining_minutes };
     },
 
     // Month overview for the "My attendance" screen (current or previous month only; the database refuses other months)
