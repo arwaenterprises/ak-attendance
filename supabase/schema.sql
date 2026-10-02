@@ -1,0 +1,25 @@
+-- ============================================================
+-- Dawam Attendance - Supabase schema
+-- ============================================================
+-- STATUS: SKELETON. Not yet runnable.
+-- Reason: the repository contains no SQL, and the code alone does not show
+-- column types, defaults, constraints or security policies. I will not guess them.
+-- Next step: owner runs supabase/export-schema.sql on the live project and sends
+-- the result; this file is then written from that, and kept up to date with every
+-- database change (see ROADMAP.md, task 2b).
+--
+-- Tables the app code reads/writes today (from the code, with how often):
+--   laborers, punch_records, daily_attendance, lop_requests, users, settings,
+--   enrollment_links, departments, punch_locations, overtime_records, holidays,
+--   ot_rates, clients, attendance_freeze, frozen_dates, audit_log
+-- Database functions called from the app:
+--   update_daily_attendance(p_labor_id, p_date), register_iqama(...)
+-- Storage bucket used: punch-photos (path punches/<laborId>_<timestamp>.jpg)
+-- Known: punch_records has labor_id, department_id, date, time, type ('login'/'logout'),
+--   location_id, location_name, confidence, photo_url, client_id, is_night_shift_end.
+--
+-- Planned changes (not applied yet):
+--   - shifts + labor_shift_assignments (start date, history kept)
+--   - min_shift_hours setting (default 4) and a database rule enforcing the 4-hour lock
+--   - single admin per client; login moved server-side; row-level security on all tables
+-- ============================================================

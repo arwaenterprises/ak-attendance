@@ -18,7 +18,8 @@ Rule for every task: do not break the existing workflow or architecture; test be
 | D2 | One Admin user per client; same login may be used on several devices at once. User Management page is removed. |
 | D3 | Two shifts: Day and Night. Admin configures them in a new **Shift Management** tab and moves labors between them. |
 | D4 | Keep the existing night-shift detection as a safety net. |
-| D5 | Add **IN / OUT choice** on the punch terminal, with checks for repeat and mismatched punches (see task 20-23). |
+| D5 | **Lock rule:** once an IN (login) punch is registered, every later punch is rejected with a clear message ("You have already logged in for the day") until at least **4 hours** have passed. After that the next punch is the OUT. Exact wording of the rule is in tasks 20-23. |
+| D8 | Keep a Supabase schema file (`supabase/schema.sql`) in the repo and update it with every database change. New Supabase project is created by the owner first (staging), live project untouched until verified. |
 | D6 | Update mechanism + PWA install prompt for all users, all pages. |
 | D7 | Test everything before implementing: baseline tests of today's behaviour first. |
 
@@ -31,7 +32,9 @@ Rule for every task: do not break the existing workflow or architecture; test be
 | # | Task | Severity | Status |
 |---|------|----------|--------|
 | 1 | Write baseline tests of today's behaviour (punch, offline sync, night shift, reports) against a fake Supabase, run them green BEFORE any change | High | Todo |
-| 2 | Set up a free second Supabase project as staging, so real-database checks never touch live data | High | Needs your answer |
+| 2 | Set up a free second Supabase project (new/staging), so real-database checks never touch live data. Owner creates it; guide in chat | High | In progress (owner creating) |
+| 2a | Export the REAL schema from the current Supabase (tables, policies, functions) with `supabase/export-schema.sql`, then build `supabase/schema.sql` from it. The code alone shows 16 tables and 2 functions but not column types, rules or security policies | High | Waiting for owner to run the export |
+| 2b | Keep `supabase/schema.sql` updated with every database change from now on (see D8) | Medium | Todo |
 | 3 | Add CI (GitHub Actions) running the tests and static checks on every push | Medium | Todo |
 
 ### 2. App update, service worker, PWA
@@ -65,17 +68,20 @@ Rule for every task: do not break the existing workflow or architecture; test be
 | 18 | Assign labors to Day or Night, one by one and in bulk, with a **start date**; history is kept so old months never change | High | Todo |
 | 19 | Reports, LOP, overtime and views read the labor's shift **on each date** | High | Todo |
 
-### 5. IN / OUT punches
+### 5. IN / OUT punches and the 4-hour lock
 
-Recommendation: let the labor choose IN or OUT and confirm. Guessing from yesterday's punches fails the moment someone forgets one punch. The existing detection stays as a fallback.
+What the code does today (read from `punch/index.html` and `js/api/punch-api.js`): the terminal does NOT ask IN or OUT. It alternates automatically: first punch = `login`, next = `logout`, next = `login`... There is a per-day punch limit setting. Offline, it only looks at punches saved on that device, not the server. There is no minimum gap between punches.
+
+My reading of your rule (please confirm, task 20): after a `login`, ANY punch within 4 hours is rejected with "You have already logged in for the day"; the first punch after 4 hours is the `logout`.
 
 | # | Task | Severity | Status |
 |---|------|----------|--------|
-| 20 | IN / OUT buttons with a confirm step on the punch terminal (check what the existing `type` column already holds first) | High | Todo |
-| 21 | Repeat-punch check: same labor, same type, within a short window (default proposal 5 min) is rejected with a clear message | High | Todo |
-| 22 | Mismatch check: IN after IN, or OUT with no open IN, shows a warning and needs a confirm; flagged for admin review instead of silently dropped | High | Todo |
-| 23 | Night shift: IN on day D pairs with OUT next morning, using the shift assignment. Same rules work offline | High | Todo |
-| 24 | Offline punches: shift and IN/OUT decisions must give the same result when synced later (today `savePunch` reads settings from the server at save time) | High | Todo |
+| 20 | Confirm the rule wording: lock = 4 hours after the IN; setting `min_shift_hours` per client, default 4; applies to day and night shift alike | High | Needs your answer |
+| 21 | Terminal rejects any punch inside the lock with a clear message showing the IN time and when OUT opens | High | Todo |
+| 22 | Same rule enforced **in the database** (not only on the screen), so a changed phone or a direct call cannot bypass it | High | Todo |
+| 23 | Offline: apply the same lock using punches saved on the device AND the last known server punches; on sync the database re-checks, and a rejected offline punch is flagged for admin review, never silently dropped | High | Todo |
+| 24 | Night shift: IN on day D pairs with the OUT next morning using the shift assignment (the existing night detection stays as fallback). Offline and online give the same result (today `savePunch` reads the shift settings from the server at save time) | High | Todo |
+| 24a | Decide what a punch after a completed OUT means (new IN for a second session, or reject). Today it starts a new IN | Medium | Needs your answer |
 
 ### 6. Platform / SaaS
 
@@ -127,7 +133,7 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 
 ## E. Open questions for you
 
-1. Staging Supabase project: can you create a free second one? (task 2)
+1. Confirm the 4-hour lock wording (task 20) and what a punch after OUT should do (task 24a)
 2. Logo for app icons, or should I make a neutral placeholder? (task 9)
 3. Who creates and resets the single admin password? (task 16)
 4. Platform Owner: page inside this app or a separate private app? (task 25)
@@ -141,3 +147,4 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 | Date | Change |
 |------|--------|
 | 2026-10-02 | Roadmap created from the code review. No application code changed yet. |
+| 2026-10-02 | Added 4-hour lock rule (tasks 20-24a), schema tasks (2a, 2b), `supabase/` folder with export query and schema skeleton. |
