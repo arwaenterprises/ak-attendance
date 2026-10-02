@@ -10,13 +10,13 @@ Rule for every task: do not break the existing workflow or architecture; test be
 
 ---
 
-## NOW - your next steps (two small groups, in this order)
+## NOW - your next steps
 
 | Step | What you do | Done? |
 |------|-------------|-------|
-| 17 | Sign-ups switched off on staging | Yes |
-| 18 | **LIVE project** (the one your real users use - check the project address contains `kyktwzwiraipwyglkhva`): SQL Editor > New query > paste the whole file `supabase/migrations/003_lop_labor_fk.sql` > Run. This fixes the LOP lists (finding 58). It only adds a link between two tables and does not change any data. Reply "live done" | No |
-| 19 | **STAGING project:** (a) Authentication > Users > Add user: email `terminal@test.dawam.arwaenterprises.com`, password `test-terminal-key-1234`, tick "Auto Confirm User". (b) SQL Editor > paste the whole file `supabase/staging-terminal-bundle.sql` > Run (shows the terminal email). Reply "staging done" | No |
+| 18 | **LIVE project** (address contains `kyktwzwiraipwyglkhva`): SQL Editor > paste [003_lop_labor_fk.sql](https://github.com/arwaenterprises/ak-attendance/blob/main/supabase/migrations/003_lop_labor_fk.sql) > Run. Fixes the LOP lists (finding 58). Reply "live done" | No |
+| 19 | Staging terminal: Auth user + terminal bundle | Yes (12 of 13 end-to-end checks passed) |
+| 20 | **STAGING project:** SQL Editor > paste [005_terminal_least_privilege.sql](https://github.com/arwaenterprises/ak-attendance/blob/claude/cool-cannon-o7cbyn/supabase/migrations/005_terminal_least_privilege.sql) > Run. Reply "005 done" | No |
 
 Parked, not forgotten: licence of the update icon picture (step 11).
 
@@ -121,7 +121,7 @@ Design (decided by me, to confirm at step 2): users log in with **Supabase Auth*
 |---|------|----------|--------|
 | S1 | Database rules: each client sees and changes only its own rows; public key gets nothing; password hashes unreadable; clients cannot edit subscriptions; audit log append-only; functions check the caller. File `supabase/migrations/001_security_foundation.sql`. **118 checks pass on a local Postgres 16** (`bash tests/db/run.sh`, also in CI); a deliberately loosened rule makes them fail. NOT applied to any Supabase project yet (it would stop the current app) | Critical | Done (tested locally) |
 | S2 | App login with Supabase Auth on staging; single admin per client; Users page removed; app pages work under the new rules; baseline tests moved to a logged-in test user. **Built:** migration 002 (one active admin per company, usernames/settings per company, subscription/expiry enforced by the database, `link_admin_profile` for the platform owner), `loginSupabase` in auth.js (one general error message, this-device-only logout, session check on every page), Users tile/page gone with the new login, tests: 21 database checks + dry run of the exact staging procedure, 5 environment checks, 12 end-to-end login/lock-out checks (`tests/auth.test.js`). The new login is **staging-only** (`DAWAM_AUTH_MODE`); the live site keeps the old login until S5. **Verified on staging 2026-10-02:** login, lock-out of the public key, two devices, session checks (12 checks), 16 baseline + 24 update tests. Page tests found finding 58 (pre-existing on live). Remaining for S2: LOP fix on staging, sign-ups off, page tests green | Critical | In progress |
-| S3 | Punch terminal: its own identity (role `terminal`, login = terminal key) and ONLY narrow database functions (`terminal_bootstrap`, `terminal_record_punch`, `terminal_punch_state`, `terminal_today_punches`, `terminal_low_confidence`); a terminal cannot read or write any table; downloads no salaries or ID numbers any more (finding 59). Migration 004 + 70 database checks (local), `js/api/terminal-api.js`, punch page and sync manager switched over for the new login only. Terminal link looks like `punch/?client=CODE#key=KEY` (the key is kept on the device and removed from the address bar). **Built; database side tested locally; browser tests written (`tests/terminal.test.js`), waiting for the staging step 19** | Critical | In progress |
+| S3 | Punch terminal: its own identity (role `terminal`, login = terminal key) and ONLY narrow database functions (`terminal_bootstrap`, `terminal_record_punch`, `terminal_punch_state`, `terminal_today_punches`, `terminal_low_confidence`); a terminal cannot read or write any table; downloads no salaries or ID numbers any more (finding 59). Migration 004 + 70 database checks (local), `js/api/terminal-api.js`, punch page and sync manager switched over for the new login only. Terminal link looks like `punch/?client=CODE#key=KEY` (the key is kept on the device and removed from the address bar). **Verified on staging: terminal starts with its key, refuses wrong/missing keys, punches (incl. night shift, duplicates, offline upload), no table access, no salary download. One finding (terminal could read the company row) fixed by migration 005, waiting for step 20 to re-run the test** | Critical | In progress |
 | S4 | Punch photos private (signed links); labor self-enrollment page through a safe function; storage rules | High | Todo |
 | S5 | Login attempt limits, audit review, remove the temporary open policies, **live cutover plan** (migrate the live admin accounts, switch the live project) with a rollback | Critical | Todo |
 

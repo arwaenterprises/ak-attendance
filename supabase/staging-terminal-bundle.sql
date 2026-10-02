@@ -3,7 +3,7 @@
 -- Paste this WHOLE file into the NEW (staging) Supabase project: SQL Editor > New query > Run.
 -- Before running: create the terminal Auth user (Authentication > Users > Add user):
 --     email:    terminal@test.dawam.arwaenterprises.com      password: test-terminal-key-1234      tick "Auto Confirm User"
--- Needs the migrations 001-003 (staging-security-bundle.sql + 003) already applied. NEVER run on the live project.
+-- Contains migrations 004 and 005. Needs 001-003 (staging-security-bundle.sql + 003) already applied. Safe to run again. NEVER run on the live project.
 -- ============================================================
 
 -- ============================================================
@@ -315,6 +315,16 @@ create policy "terminal adds punch photos" on storage.objects for insert to auth
 -- Changelog
 -- 2026-10-02  004  Written and tested locally. Not applied to any Supabase project yet.
 -- ============================================================
+
+-- ============================================================
+-- Migration 005: a terminal cannot read the company row (ROADMAP S3 hardening)
+-- ============================================================
+-- Found by the end-to-end terminal test on staging: the rule "you may read your own company row" (migration 001) also let a
+-- terminal read its company's contact and subscription details. A terminal does not need them (it gets the company name and code
+-- through terminal_bootstrap), so only staff (admin / supervisor) may read the company row now.
+drop policy if exists "own client row" on public.clients;
+create policy "own client row" on public.clients for select to authenticated
+    using (id = (select public.current_client_id()) and (select public.is_staff()));
 
 -- ---------- link the staging test terminal (the Auth user above must exist) ----------
 select public.link_terminal_profile('TEST') as linked_terminal_email;

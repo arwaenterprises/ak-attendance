@@ -24,10 +24,11 @@ function terminalBundle() {
 -- Paste this WHOLE file into the NEW (staging) Supabase project: SQL Editor > New query > Run.
 -- Before running: create the terminal Auth user (Authentication > Users > Add user):
 --     email:    terminal@test.dawam.arwaenterprises.com      password: test-terminal-key-1234      tick "Auto Confirm User"
--- Needs the migrations 001-003 (staging-security-bundle.sql + 003) already applied. NEVER run on the live project.
+-- Contains migrations 004 and 005. Needs 001-003 (staging-security-bundle.sql + 003) already applied. Safe to run again. NEVER run on the live project.
 -- ============================================================
 
 ` + read('migrations/004_terminal.sql') + `
+` + read('migrations/005_terminal_least_privilege.sql') + `
 -- ---------- link the staging test terminal (the Auth user above must exist) ----------
 select public.link_terminal_profile('TEST') as linked_terminal_email;
 `;
