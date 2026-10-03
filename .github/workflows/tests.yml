@@ -9,6 +9,9 @@ on:
 
 jobs:
   tests:
+    # The browser tests share one staging project and one test company (the platform-owner suite resets its password):
+    # two runs at the same time (the push run and the pull-request run) made one sign-in test fail now and then. One at a time.
+    concurrency: staging-browser-tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
