@@ -84,7 +84,7 @@ const ReportAPI = {
             while (true) {
                 let punchQ = supabaseClient
                     .from('punch_records')
-                    .select('labor_id, date, time, location_name, is_night_shift_end, early_out, early_minutes')
+                    .select('labor_id, date, time, type, location_name, is_night_shift_end, early_out, early_minutes')
                     .eq('client_id', clientId)
                     .gte('date', fromDate)
                     .lte('date', toDate)
@@ -148,12 +148,14 @@ const ReportAPI = {
                 if (!punchLocationMap[key]) punchLocationMap[key] = p.location_name || '';
                 if (!punchTimeMap[key]) punchTimeMap[key] = { firstIn: null, lastOut: null, nightEnd: null };
                 if (p.is_night_shift_end) {
-                    if (!punchTimeMap[key].nightEnd || p.time > punchTimeMap[key].nightEnd)
+                    // an OUT that ended a night shift; an IN after it (a second session) is not part of the first-IN / last-OUT times
+                    if (p.type !== 'login' && (!punchTimeMap[key].nightEnd || p.time > punchTimeMap[key].nightEnd))
                         punchTimeMap[key].nightEnd = p.time;
                 } else {
+                    // hours = first IN to the LAST OUT of the day; an open second IN does not move the last OUT
                     if (!punchTimeMap[key].firstIn || p.time < punchTimeMap[key].firstIn)
                         punchTimeMap[key].firstIn = p.time;
-                    if (!punchTimeMap[key].lastOut || p.time > punchTimeMap[key].lastOut)
+                    if (p.type !== 'login' && (!punchTimeMap[key].lastOut || p.time > punchTimeMap[key].lastOut))
                         punchTimeMap[key].lastOut = p.time;
                 }
             });
@@ -163,6 +165,7 @@ const ReportAPI = {
                     if (!entry.firstIn) entry.firstIn = entry.nightEnd;
                 }
                 if (!entry.firstIn) entry.firstIn = entry.lastOut;
+                if (!entry.lastOut) entry.lastOut = entry.firstIn;   // only an IN so far: shown as before (same time, 0 hours)
             }
 
             const deptMap = {};
@@ -643,7 +646,7 @@ const ReportAPI = {
             while (true) {
                 let bQ = supabaseClient
                     .from('punch_records')
-                    .select('labor_id, date, time, is_night_shift_end')
+                    .select('labor_id, date, time, type, is_night_shift_end')
                     .eq('client_id', AUTH.getClientId())
                     .gte('date', fetchFrom)
                     .lte('date', fetchTo)
@@ -663,18 +666,21 @@ const ReportAPI = {
                 const key = `${p.labor_id}_${p.date}`;
                 if (!punchTimeMap[key]) punchTimeMap[key] = { firstIn: null, lastOut: null, nightEnd: null };
                 if (p.is_night_shift_end) {
-                    if (!punchTimeMap[key].nightEnd || p.time > punchTimeMap[key].nightEnd)
+                    // an OUT that ended a night shift; an IN after it (a second session) is not part of the first-IN / last-OUT times
+                    if (p.type !== 'login' && (!punchTimeMap[key].nightEnd || p.time > punchTimeMap[key].nightEnd))
                         punchTimeMap[key].nightEnd = p.time;
                 } else {
+                    // hours = first IN to the LAST OUT of the day; an open second IN does not move the last OUT
                     if (!punchTimeMap[key].firstIn || p.time < punchTimeMap[key].firstIn)
                         punchTimeMap[key].firstIn = p.time;
-                    if (!punchTimeMap[key].lastOut || p.time > punchTimeMap[key].lastOut)
+                    if (p.type !== 'login' && (!punchTimeMap[key].lastOut || p.time > punchTimeMap[key].lastOut))
                         punchTimeMap[key].lastOut = p.time;
                 }
             });
             for (const entry of Object.values(punchTimeMap)) {
                 if (entry.nightEnd) { entry.lastOut = entry.nightEnd; if (!entry.firstIn) entry.firstIn = entry.nightEnd; }
                 if (!entry.firstIn) entry.firstIn = entry.lastOut;
+                if (!entry.lastOut) entry.lastOut = entry.firstIn;   // only an IN so far: shown as before (same time, 0 hours)
             }
 
             // Get holidays — extend range ±1 day to match attendance buffer (cross-month blocks)

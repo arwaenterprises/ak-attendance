@@ -135,10 +135,13 @@ const JPEG_B64 = require('fs').readFileSync(__dirname + '/photos.test.js', 'utf8
     const flag = await admin.evaluate(async (L) => (await supabaseClient.from('punch_records').select('early_out, early_minutes').eq('labor_id', L).eq('type', 'logout').single()).data, LABOR);
     ok(flag.early_out === true && flag.early_minutes > 200, JSON.stringify(flag)); await waitClosed();
   });
-  await test('IN after the OUT the same day is refused: "You have already logged out for the day"; nothing new is stored', async () => {
-    await press('#inBtn', LABOR); await waitResult('k-warn');
-    const o = await ov(); ok(/already logged out for the day/i.test(o.title), JSON.stringify(o));
-    eq((await adminRows()).length, 2); await waitClosed();
+  await test('IN after the OUT the same day is accepted (second session); the day still counts from the first IN to the OUT (needs migration 016)', async () => {
+    await press('#inBtn', LABOR); await waitResult('k-success');
+    const o = await ov(); ok(/Punched IN/.test(o.title), JSON.stringify(o));
+    const rows = await adminRows(); eq(rows.map(r => r.type).sort(), ['login', 'login', 'logout']);
+    const out = await admin.evaluate(async (L) => (await supabaseClient.from('punch_records').select('time').eq('labor_id', L).eq('type', 'logout').single()).data.time, LABOR);
+    const day = await admin.evaluate(async (L) => (await supabaseClient.from('daily_attendance').select('last_logout, total_hours').eq('labor_id', L).single()).data, LABOR);
+    eq(day.last_logout, out); ok(Number(day.total_hours) > 0, JSON.stringify(day)); await waitClosed();
   });
   await test('an unknown ID shows a message under the ID box and starts nothing', async () => {
     await press('#inBtn', 'NOPE999');
