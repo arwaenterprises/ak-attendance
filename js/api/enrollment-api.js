@@ -223,18 +223,13 @@ const EnrollmentAPI = {
                 parsedDescriptor = JSON.parse(parsedDescriptor);
             }
 
-            // keep a tiny copy of the enrolment photo (shown in Labor Master); the full photo is deleted below
-            let faceThumb = null;
-            try { faceThumb = enrollment.photo_url ? await LaborAPI.thumbFromPhoto(enrollment.photo_url) : null; } catch (e) { console.warn('Small photo not made:', e); }
-
             const { error: laborError } = await supabaseClient
                 .from('laborers')
                 .update({
                     face_descriptor: parsedDescriptor,
                     face_enrolled: true,
                     needs_reenrollment: false,
-                    face_photo_url: null,
-                    ...(faceThumb ? { face_thumb: faceThumb } : {})
+                    face_photo_url: null
                 })
                 .eq('client_id', clientId)
                 .eq('labor_id', enrollment.labor_id);

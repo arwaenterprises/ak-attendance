@@ -30,46 +30,6 @@ const LaborAPI = {
         }
     },
 
-    // A tiny face photo (data link) made from a photo file in the private photo bucket (path or old web address). Needs photo-utils.js.
-    async thumbFromPhoto(ref) {
-        const path = PhotoURL.pathOf(ref);
-        if (!path) return null;
-        const { data, error } = await supabaseClient.storage.from(PhotoURL.BUCKET).download(path);
-        if (error || !data) return null;
-        const bmp = await createImageBitmap(data);
-        const c = document.createElement('canvas');
-        c.width = bmp.width; c.height = bmp.height;
-        c.getContext('2d').drawImage(bmp, 0, 0);
-        return PhotoUtils.makeThumb(c, null);
-    },
-
-    // Fill the empty small photos from each labor's latest punch photo (the terminal keeps punch photos for 15 days).
-    // Runs in the background after Labor Master is shown; onFilled(laborId, thumb) is called for every photo that was made.
-    async backfillThumbs(laborers, onFilled) {
-        try {
-            const missing = laborers.filter(l => !l.face_thumb && l.face_enrolled);
-            if (!missing.length) return 0;
-            const ids = new Set(missing.map(l => l.labor_id));
-            const { data, error } = await supabaseClient.from('punch_records').select('labor_id, photo_url')
-                .eq('client_id', AUTH.getClientId()).not('photo_url', 'is', null)
-                .order('date', { ascending: false }).order('time', { ascending: false }).limit(3000);
-            if (error || !data) return 0;
-            const latest = {};
-            for (const r of data) if (ids.has(r.labor_id) && !latest[r.labor_id]) latest[r.labor_id] = r.photo_url;
-            let done = 0;
-            for (const id of Object.keys(latest)) {
-                try {
-                    const thumb = await this.thumbFromPhoto(latest[id]);
-                    if (!thumb) continue;
-                    const { error: upErr } = await supabaseClient.from('laborers').update({ face_thumb: thumb })
-                        .eq('client_id', AUTH.getClientId()).eq('labor_id', id).is('face_thumb', null);
-                    if (!upErr) { done++; if (onFilled) onFilled(id, thumb); }
-                } catch (e) { /* skip this labor */ }
-            }
-            return done;
-        } catch (e) { return 0; }
-    },
-
     // Get active laborers only
     async getActive() {
         try {
