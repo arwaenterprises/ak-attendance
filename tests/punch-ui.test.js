@@ -76,6 +76,15 @@ const JPEG_B64 = require('fs').readFileSync(__dirname + '/photos.test.js', 'utf8
     const o = await ov(); ok(/Punched IN/.test(o.title) && /Terminal Test/.test(o.details) && /Day shift/.test(o.details), JSON.stringify(o));
     const rows = await adminRows(); eq(rows.map(r => r.type), ['login']);
   });
+  await test('the punch keeps its photo: the record holds the photo path and the file exists (v90 broke this silently)', async () => {
+    const r = await admin.evaluate(async (L) => {
+      const row = (await supabaseClient.from('punch_records').select('photo_url').eq('labor_id', L).eq('type', 'login').single()).data;
+      const sig = row && row.photo_url ? await supabaseClient.storage.from('punch-photos').createSignedUrl(row.photo_url, 60) : null;
+      return { path: row && row.photo_url, signed: !!(sig && sig.data && sig.data.signedUrl) };
+    }, LABOR);
+    ok(r.path && /^[0-9a-f-]{36}\/punches\/.+\.jpg$/.test(r.path), 'photo_url: ' + r.path);
+    ok(r.signed, 'photo file can be opened');
+  });
   await test('the result screen closes by itself after about 7 seconds and the ID box is cleared', async () => {
     const t0 = Date.now(); await waitClosed(); const secs = (Date.now() - t0) / 1000;
     ok(secs > 4 && secs < 10, 'closed after ' + secs + 's');
