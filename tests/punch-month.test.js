@@ -45,7 +45,7 @@ const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.get
     const r1 = await supabaseClient.from('daily_attendance').insert([mk(a.d1, '06:00', '16:00', 10, 'P'), mk(a.d2, '06:00', '10:00', 4, 'H'), mk(a.d3, null, null, 0, 'A'), mk(a.prev, '06:00', '15:00', 9, 'P')]);
     // day 1: IN 06:15, OUT 10:30, IN 11:00, OUT 16:00 (two sessions)
     const r3 = await supabaseClient.from('punch_records').insert([
-      { labor_id: a.L, department_id: a.dept, date: a.d1, time: '06:15:00', type: 'login', location_name: 'Gate', client_id: cid },
+      { labor_id: a.L, department_id: a.dept, date: a.d1, time: '06:15:00', type: 'login', location_name: 'Gate', client_id: cid, photo_url: cid + '/punches/' + a.L + '_1.jpg' },
       { labor_id: a.L, department_id: a.dept, date: a.d1, time: '10:30:00', type: 'logout', location_name: 'Gate', client_id: cid },
       { labor_id: a.L, department_id: a.dept, date: a.d1, time: '11:00:00', type: 'login', location_name: 'Gate', client_id: cid },
       { labor_id: a.L, department_id: a.dept, date: a.d1, time: '16:00:00', type: 'logout', location_name: 'Gate', client_id: cid }]);
@@ -89,6 +89,17 @@ const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.get
     ok(tops[0] === tops[1] && tops[2] === tops[3] && tops[2] > tops[0], '2 x 2 tiles: ' + JSON.stringify(tops));
     const title = await page.locator('#dayTitle').innerText();
     ok(/9h 45m worked/.test(title), 'first IN 06:15 to last OUT 16:00 = 9h 45m: ' + JSON.stringify(title));
+  });
+  await test('tapping a punch tile with a photo opens the photo full screen (once); tapping the photo closes it; a tile without a photo does nothing', async () => {
+    await page.evaluate(() => { window.__opened = 0; PhotoURL.resolve = async () => { window.__opened++; return 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; }; });
+    await page.locator('#attendanceList .punch-item.has-photo').first().click();
+    await page.waitForFunction(() => document.getElementById('fullscreenPhoto').classList.contains('active'), null, { timeout: 5000 });
+    eq(await page.evaluate(() => window.__opened), 1);
+    await page.click('#fullscreenPhoto', { position: { x: 10, y: 10 } });
+    await page.waitForFunction(() => !document.getElementById('fullscreenPhoto').classList.contains('active'), null, { timeout: 5000 });
+    await page.locator('#attendanceList .punch-item:not(.has-photo)').first().click();
+    await page.waitForTimeout(300);
+    ok(!(await page.evaluate(() => document.getElementById('fullscreenPhoto').classList.contains('active'))), 'a tile without photo must not open anything');
   });
   await test('the Close button shows the whole word "Close" (not cut off)', async () => {
     const c = await page.evaluate(() => { const e = document.querySelector('.attendance-close'), b = e.getBoundingClientRect(); return { w: b.width, scrollW: e.scrollWidth, right: b.right, vw: window.innerWidth }; });

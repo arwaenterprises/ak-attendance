@@ -253,6 +253,8 @@
         .attendance-modal .punch-details .type-label { display: none; }
         .attendance-modal .punch-details .time { font-size: 18px; font-weight: 800; margin: 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
         .attendance-modal .punch-details .location { grid-column: 1 / -1; font-size: 12px; color: #94A3B8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .attendance-modal .punch-item.has-photo { cursor: pointer; }
+        .attendance-modal .punch-item.has-photo:active { background: #16233B; }
         .attendance-modal .punch-photo { grid-column: 1 / -1; width: 100%; height: 56px; border-radius: 8px; object-fit: cover; }
         .no-punches { color: #94A3B8; text-align: center; padding: 14px 10px; font-size: 15px; }
 
@@ -621,7 +623,7 @@
         </div>
 
         <!-- Fullscreen Photo -->
-        <div class="fullscreen-photo" id="fullscreenPhoto">
+        <div class="fullscreen-photo" id="fullscreenPhoto" onclick="closeFullscreenPhoto()">
             <button class="close-btn" onclick="closeFullscreenPhoto()">✕</button>
             <img id="fullscreenImg" src="" alt="Punch Photo">
         </div>
@@ -631,15 +633,15 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="../js/config/supabase.js?v=97"></script>
-    <script src="../js/utils/date-utils.js?v=97"></script>
-    <script src="../js/utils/photo-utils.js?v=97"></script>
-    <script src="../js/utils/offline-storage.js?v=97"></script>
-    <script src="../js/utils/sync-manager.js?v=97"></script>
-    <script src="../js/api/labor-api.js?v=97"></script>
-    <script src="../js/api/punch-api.js?v=97"></script>
-    <script src="../js/api/terminal-api.js?v=97"></script>
-    <script src="../js/utils/photo-url.js?v=97"></script>
+    <script src="../js/config/supabase.js?v=98"></script>
+    <script src="../js/utils/date-utils.js?v=98"></script>
+    <script src="../js/utils/photo-utils.js?v=98"></script>
+    <script src="../js/utils/offline-storage.js?v=98"></script>
+    <script src="../js/utils/sync-manager.js?v=98"></script>
+    <script src="../js/api/labor-api.js?v=98"></script>
+    <script src="../js/api/punch-api.js?v=98"></script>
+    <script src="../js/api/terminal-api.js?v=98"></script>
+    <script src="../js/utils/photo-url.js?v=98"></script>
 
     <script>
         // ============ ONE SCREEN, NO SCROLL ============
@@ -1517,10 +1519,11 @@ localStorage.setItem('pwa_client_code', clientCode);
             if (!punches || punches.length === 0) { listEl.innerHTML = '<div class="no-punches">No punches this day</div>'; return; }
             listEl.innerHTML = punches.map(p => {
                 const isIn = p.type === 'login';
-                return `<div class="punch-item">
+                // tapping a tile with a photo opens the photo full screen
+                return `<div class="punch-item${p.photo_url ? ' has-photo' : ''}"${p.photo_url ? ` data-photo="${esc(p.photo_url)}" onclick="bumpIdle(); openFullscreenPhoto(this.dataset.photo)"` : ''}>
                     <div class="punch-type ${isIn ? 'login' : 'logout'}">${isIn ? 'IN' : 'OUT'}</div>
                     <div class="punch-details"><div class="time">${esc(formatTime(p.time))}</div><div class="location">${esc(p.location_name || '')}</div></div>
-                    ${p.photo_url ? `<img class="punch-photo" src="${PhotoURL.src(p.photo_url)}" data-photo="${esc(p.photo_url)}" onclick="openFullscreenPhoto(this.dataset.photo)" alt="Punch photo">` : ''}
+                    ${p.photo_url ? `<img class="punch-photo" src="${PhotoURL.src(p.photo_url)}" data-photo="${esc(p.photo_url)}" alt="Punch photo">` : ''}
                 </div>`;
             }).join('');
             PhotoURL.hydrate(listEl);
@@ -1601,7 +1604,7 @@ localStorage.setItem('pwa_client_code', clientCode);
             updateLocationBar('Offline mode - Punches will sync later', true);
         });
     </script>
-    <script src="../js/ui/app-update.js?v=97"></script>
-    <script src="../js/ui/pwa-install.js?v=97"></script>
+    <script src="../js/ui/app-update.js?v=98"></script>
+    <script src="../js/ui/pwa-install.js?v=98"></script>
 </body>
 </html>
