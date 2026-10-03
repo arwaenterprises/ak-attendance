@@ -71,8 +71,18 @@ const JPEG_B64 = require('fs').readFileSync(__dirname + '/photos.test.js', 'utf8
     eq((await adminRows()).length, 0);
     await waitClosed();
   });
+  await test('the ID box and the buttons sit in the middle over the oval; after IN they go away and only the oval stays, with a countdown', async () => {
+    const mid = await page.evaluate(() => { const c = document.querySelector('.camera-section').getBoundingClientRect(), p = document.getElementById('idInputPanel').getBoundingClientRect(), g = document.getElementById('faceGuide').getBoundingClientRect();
+      return { camMid: (c.top + c.bottom) / 2, panelMid: (p.top + p.bottom) / 2, ovalMid: (g.top + g.bottom) / 2 }; });
+    ok(Math.abs(mid.panelMid - mid.camMid) < 40, 'ID box is not in the middle: ' + JSON.stringify(mid));
+    ok(Math.abs(mid.ovalMid - mid.camMid) < 40, 'oval is not in the middle: ' + JSON.stringify(mid));
+    await page.fill('#laborIdInput', LABOR); await page.click('#inBtn');
+    await page.waitForFunction(() => document.getElementById('idInputPanel').classList.contains('hidden') && document.getElementById('faceStage').classList.contains('on'), null, { timeout: 5000 });
+    const st = await page.evaluate(() => ({ oval: getComputedStyle(document.getElementById('faceGuide')).display, panel: getComputedStyle(document.getElementById('idInputPanel')).display, text: document.getElementById('faceStage').innerText }));
+    eq(st.panel, 'none'); ok(st.oval !== 'none', 'oval must stay'); ok(/Look into the oval/.test(st.text), st.text);
+  });
   await test('IN is recorded: green screen "Punched IN" with the name; one record', async () => {
-    await press('#inBtn', LABOR); await waitResult('k-success');
+    await waitResult('k-success');
     const o = await ov(); ok(/Punched IN/.test(o.title) && /Terminal Test/.test(o.details) && /Day shift/.test(o.details), JSON.stringify(o));
     const rows = await adminRows(); eq(rows.map(r => r.type), ['login']);
   });

@@ -177,11 +177,15 @@
         .date { font-size: 12px; color: #94A3B8; }
         .camera-section { background: #0B1220; min-height: 0; overflow: hidden; }
         .top-bar { flex-shrink: 0; }
-        .face-guide { width: min(62vw, 260px); height: min(80vw, 340px); max-height: calc(100% - 210px); border: 4px solid #4ADE80; border-radius: 50%; top: calc(50% - 90px); transform: translate(-50%, -50%); box-shadow: 0 0 0 9999px rgba(11,18,32,0.35), 0 0 30px rgba(74,222,128,0.35); }
+        .face-guide { width: min(62vw, 260px); height: min(80vw, 340px); max-height: calc(100% - 90px); border: 4px solid #4ADE80; border-radius: 50%; top: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 0 9999px rgba(11,18,32,0.35), 0 0 30px rgba(74,222,128,0.35); }
         .location-bar { top: 12px; bottom: auto; left: 12px; transform: none; background: rgba(11,18,32,0.82); color: #CBD5E1; padding: 7px 13px; border-radius: 999px; font-size: 13px; font-weight: 600; max-width: 85%; }
         .location-bar.valid { background: rgba(11,18,32,0.82); color: #4ADE80; }
         .location-bar.invalid { background: rgba(127,29,29,0.92); color: #FECACA; }
-        .id-input-panel { top: auto; bottom: 0; left: 0; right: 0; transform: none; width: 100%; max-width: none; border-radius: 24px 24px 0 0; padding: 16px 16px max(16px, env(safe-area-inset-bottom)); background: linear-gradient(to top, #0B1220 70%, rgba(11,18,32,0.94)); text-align: left; }
+        .id-input-panel { top: 50%; bottom: auto; left: 50%; right: auto; transform: translate(-50%, -50%); width: min(92%, 380px); max-width: 380px; border-radius: 24px; padding: 16px; background: rgba(11,18,32,0.88); text-align: left; box-shadow: 0 10px 40px rgba(0,0,0,0.45); }
+        .face-stage { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 5; text-align: center; color: #F8FAFC; background: rgba(11,18,32,0.82); border-radius: 18px; padding: 10px 22px; display: none; pointer-events: none; }
+        .face-stage.on { display: block; }
+        .face-stage .t { font-size: 20px; font-weight: 800; }
+        .face-stage .n { font-size: 44px; font-weight: 800; line-height: 1.1; color: #4ADE80; font-variant-numeric: tabular-nums; }
         .id-input-panel input { width: 100%; padding: 0 16px; height: 56px; font-size: 26px; font-weight: 800; letter-spacing: 1px; background: #111C30; color: #F8FAFC; border: 2px solid #38BDF8; border-radius: 14px; text-align: left; text-transform: uppercase; outline: none; }
         .id-input-panel input::placeholder { font-size: 17px; font-weight: 600; letter-spacing: 0; color: #64748B; text-transform: none; }
         .id-input-panel input:focus { border-color: #7DD3FC; }
@@ -551,6 +555,7 @@
             <video id="video" autoplay playsinline></video>
             <canvas id="canvas"></canvas>
             <div class="face-guide" id="faceGuide"></div>
+            <div class="face-stage" id="faceStage"><div class="t">Look into the oval</div><div class="n" id="faceCount"></div></div>
             
             <!-- Location chip -->
             <div class="location-bar" id="locationBar">Detecting location...</div>
@@ -629,15 +634,15 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="../js/config/supabase.js?v=94"></script>
-    <script src="../js/utils/date-utils.js?v=94"></script>
-    <script src="../js/utils/photo-utils.js?v=94"></script>
-    <script src="../js/utils/offline-storage.js?v=94"></script>
-    <script src="../js/utils/sync-manager.js?v=94"></script>
-    <script src="../js/api/labor-api.js?v=94"></script>
-    <script src="../js/api/punch-api.js?v=94"></script>
-    <script src="../js/api/terminal-api.js?v=94"></script>
-    <script src="../js/utils/photo-url.js?v=94"></script>
+    <script src="../js/config/supabase.js?v=95"></script>
+    <script src="../js/utils/date-utils.js?v=95"></script>
+    <script src="../js/utils/photo-utils.js?v=95"></script>
+    <script src="../js/utils/offline-storage.js?v=95"></script>
+    <script src="../js/utils/sync-manager.js?v=95"></script>
+    <script src="../js/api/labor-api.js?v=95"></script>
+    <script src="../js/api/punch-api.js?v=95"></script>
+    <script src="../js/api/terminal-api.js?v=95"></script>
+    <script src="../js/utils/photo-url.js?v=95"></script>
 
     <script>
         // ============ ONE SCREEN, NO SCROLL ============
@@ -1048,6 +1053,22 @@ localStorage.setItem('pwa_client_code', clientCode);
             setTimeout(() => errorEl.style.display = 'none', 4000);
         }
 
+        // Hide the ID box + buttons and let the labor line up with the oval (FACE_COUNTDOWN_SECONDS, default 3), then the photo is taken
+        window.FACE_COUNTDOWN_SECONDS = 3;
+        async function faceStage() {
+            const input = document.getElementById('laborIdInput');
+            if (input) input.blur();
+            document.getElementById('idInputPanel').classList.add('hidden');
+            const stage = document.getElementById('faceStage'), count = document.getElementById('faceCount');
+            stage.classList.add('on');
+            for (let n = Number(window.FACE_COUNTDOWN_SECONDS) || 0; n > 0; n--) {
+                count.textContent = n;
+                await new Promise(r => setTimeout(r, 1000));
+            }
+            count.textContent = '';
+            stage.classList.remove('on');
+        }
+
         // Process punch
         async function processPunch(kind) {
             // kind = 'login' (IN button) or 'logout' (OUT button): the labor decides, the checks below confirm it
@@ -1057,6 +1078,9 @@ localStorage.setItem('pwa_client_code', clientCode);
                 return;
             }
             if (!(await verifyLaborId())) return;
+
+            // ID and area are fine: the ID box and the buttons go away, only the oval stays; a short countdown, then the photo
+            await faceStage();
 
             isPunching = true;
             setPunchButtons(false);
@@ -1208,6 +1232,7 @@ localStorage.setItem('pwa_client_code', clientCode);
                 showStatus('error', 'Not recorded', '', error.message);
                 setTimeout(() => {
                     document.getElementById('statusOverlay').classList.remove('active');
+                    document.getElementById('idInputPanel').classList.remove('hidden');
                     isPunching = false;
                     setPunchButtons(true);
                 }, 4000);
@@ -1590,7 +1615,7 @@ localStorage.setItem('pwa_client_code', clientCode);
             updateLocationBar('Offline mode - Punches will sync later', true);
         });
     </script>
-    <script src="../js/ui/app-update.js?v=94"></script>
-    <script src="../js/ui/pwa-install.js?v=94"></script>
+    <script src="../js/ui/app-update.js?v=95"></script>
+    <script src="../js/ui/pwa-install.js?v=95"></script>
 </body>
 </html>
