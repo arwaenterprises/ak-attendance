@@ -11,6 +11,8 @@
             align-items: center;
             gap: 5px;
         }
+        .labor-thumb { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; display: block; background: #edf2f7; }
+        .labor-thumb-empty { display: flex; align-items: center; justify-content: center; font-size: 22px; color: #a0aec0; }
         .face-status.enrolled { color: #48bb78; }
         .face-status.not-enrolled { color: #e53e3e; }
         .face-status.needs-reenroll { color: #ed8936; }
@@ -173,6 +175,7 @@
                 <table>
                     <thead>
                         <tr>
+                            <th>Photo</th>
                             <th>Labor ID</th>
                             <th>Name</th>
                             <th>Iqama</th>
@@ -186,6 +189,7 @@
                             <th>Actions</th>
                         </tr>
                         <tr class="filter-row">
+                            <th></th>
                             <th><input type="text" class="col-filter" id="filterId" placeholder="Search..." onkeyup="applyFilters()"></th>
                             <th><input type="text" class="col-filter" id="searchInput" placeholder="Search..." onkeyup="applyFilters()"></th>
                             <th><input type="text" class="col-filter" id="filterIqama" placeholder="Search..." onkeyup="applyFilters()"></th>
@@ -222,7 +226,7 @@
                     </thead>
                     <tbody id="laborTable">
                         <tr>
-                            <td colspan="11" class="text-center p-20">Loading...</td>
+                            <td colspan="12" class="text-center p-20">Loading...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -359,17 +363,17 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="../js/config/supabase.js?v=90"></script>
-    <script src="../js/auth/auth.js?v=90"></script>
-    <script src="../js/utils/date-utils.js?v=90"></script>
-    <script src="../js/utils/csv-handler.js?v=90"></script>
-    <script src="../js/ui/sync-indicator.js?v=90"></script>
-    <script src="../js/ui/toast.js?v=90"></script>
-    <script src="../js/api/department-api.js?v=90"></script>
-    <script src="../js/api/labor-api.js?v=90"></script>
-    <script src="../js/api/shift-api.js?v=90"></script>
-    <script src="../js/utils/photo-url.js?v=90"></script>
-    <script src="../js/api/enrollment-api.js?v=90"></script>
+    <script src="../js/config/supabase.js?v=91"></script>
+    <script src="../js/auth/auth.js?v=91"></script>
+    <script src="../js/utils/date-utils.js?v=91"></script>
+    <script src="../js/utils/csv-handler.js?v=91"></script>
+    <script src="../js/ui/sync-indicator.js?v=91"></script>
+    <script src="../js/ui/toast.js?v=91"></script>
+    <script src="../js/api/department-api.js?v=91"></script>
+    <script src="../js/api/labor-api.js?v=91"></script>
+    <script src="../js/api/shift-api.js?v=91"></script>
+    <script src="../js/utils/photo-url.js?v=91"></script>
+    <script src="../js/api/enrollment-api.js?v=91"></script>
 
     <script>
         // Require login
@@ -439,7 +443,7 @@
                 SyncIndicator.hide();
                 Toast.error('Failed to load data: ' + error.message);
                 document.getElementById('laborTable').innerHTML = `
-                    <tr><td colspan="11" class="text-center p-20 text-danger">
+                    <tr><td colspan="12" class="text-center p-20 text-danger">
                         ❌ Failed to load. Check internet connection.
                     </td></tr>
                 `;
@@ -510,7 +514,7 @@
 
             if (filteredLaborers.length === 0) {
                 tbody.innerHTML = `
-                    <tr><td colspan="11" class="text-center p-20 text-muted">
+                    <tr><td colspan="12" class="text-center p-20 text-muted">
                         No laborers found. ${session.role !== 'supervisor' ? 'Click "Add Labor" to create one.' : ''}
                     </td></tr>
                 `;
@@ -565,6 +569,7 @@
 
                 return `
                     <tr>
+                        <td>${labor.face_thumb ? `<img class="labor-thumb" src="${labor.face_thumb}" alt="">` : '<span class="labor-thumb labor-thumb-empty" title="Photo appears after the next punch on the terminal">&#128100;</span>'}</td>
                         <td><strong>${labor.labor_id}</strong></td>
                         <td>${labor.name}</td>
                         <td>${labor.iqama_number}</td>
@@ -985,6 +990,6 @@
         loadData();
         loadPendingCount();
     </script>
-    <script src="../js/ui/app-update.js?v=90"></script>
+    <script src="../js/ui/app-update.js?v=91"></script>
 </body>
 </html>

@@ -42,6 +42,7 @@ jobs:
           node terminal-link-ui.test.js
           node platform-ui.test.js
           node shift-reports.test.js
+          node face-refresh.test.js
           node update.test.js
           node smoke.test.js
 
