@@ -36,6 +36,28 @@ const PhotoUtils = {
         });
     },
 
+    // A tiny square photo of the face (about 2-4 KB, as a data link) for the Labor Master list.
+    // `box` is the detected face box { x, y, width, height }; without it the middle of the picture is used.
+    makeThumb(canvas, box, size = 96) {
+        let sx, sy, side;
+        if (box && box.width > 0) {
+            side = Math.max(box.width, box.height) * 1.5;                 // some room around the face
+            sx = box.x + box.width / 2 - side / 2;
+            sy = box.y + box.height / 2 - side / 2;
+        } else {
+            side = Math.min(canvas.width, canvas.height);
+            sx = (canvas.width - side) / 2;
+            sy = (canvas.height - side) / 2;
+        }
+        side = Math.min(side, canvas.width, canvas.height);
+        sx = Math.max(0, Math.min(sx, canvas.width - side));
+        sy = Math.max(0, Math.min(sy, canvas.height - side));
+        const t = document.createElement('canvas');
+        t.width = size; t.height = size;
+        t.getContext('2d').drawImage(canvas, sx, sy, side, side, 0, 0, size, size);
+        return t.toDataURL('image/jpeg', 0.6);
+    },
+
     // Capture photo from video element
     async captureFromVideo(videoElement, mirror = true) {
         const canvas = document.createElement('canvas');
@@ -103,4 +125,4 @@ const PhotoUtils = {
         img.onclick = () => this.openFullSize(photoUrl);
         return img;
     }
-};
+};

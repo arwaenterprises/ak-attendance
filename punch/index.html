@@ -629,15 +629,15 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="../js/config/supabase.js?v=90"></script>
-    <script src="../js/utils/date-utils.js?v=90"></script>
-    <script src="../js/utils/photo-utils.js?v=90"></script>
-    <script src="../js/utils/offline-storage.js?v=90"></script>
-    <script src="../js/utils/sync-manager.js?v=90"></script>
-    <script src="../js/api/labor-api.js?v=90"></script>
-    <script src="../js/api/punch-api.js?v=90"></script>
-    <script src="../js/api/terminal-api.js?v=90"></script>
-    <script src="../js/utils/photo-url.js?v=90"></script>
+    <script src="../js/config/supabase.js?v=91"></script>
+    <script src="../js/utils/date-utils.js?v=91"></script>
+    <script src="../js/utils/photo-utils.js?v=91"></script>
+    <script src="../js/utils/offline-storage.js?v=91"></script>
+    <script src="../js/utils/sync-manager.js?v=91"></script>
+    <script src="../js/api/labor-api.js?v=91"></script>
+    <script src="../js/api/punch-api.js?v=91"></script>
+    <script src="../js/api/terminal-api.js?v=91"></script>
+    <script src="../js/utils/photo-url.js?v=91"></script>
 
     <script>
         // ============ ONE SCREEN, NO SCROLL ============
@@ -1182,6 +1182,7 @@ localStorage.setItem('pwa_client_code', clientCode);
                         return;
                     }
                     if (saveResult.success && saveResult.data && saveResult.data.shift_name) shiftName = saveResult.data.shift_name;
+                    if (saveResult.success) keepFaceFresh(currentLabor.labor_id, canvas, detection, confidence, minConfidence);
                     if (!saveResult.success) {
                         punchData.photoBlob = photoBlob;
                         await OfflineStorage.savePunch(punchData);
@@ -1211,6 +1212,25 @@ localStorage.setItem('pwa_client_code', clientCode);
                     setPunchButtons(true);
                 }, 4000);
             }
+        }
+
+        // After an accepted punch (never blocks it, never shown to the labor):
+        //  - the labor has no small photo yet: send one (once per device and labor)
+        //  - the match was accepted but weaker than usual (below face_refresh_threshold, default 85): replace the saved face + photo with the fresh ones
+        //    (the database only does this when the confidence is at least the company's confidence_threshold, and at most once a day)
+        function keepFaceFresh(laborId, canvas, detection, confidence, minConfidence) {
+            try {
+                const refreshBelow = parseInt(settings.face_refresh_threshold || '85');
+                const weak = confidence >= minConfidence && confidence < refreshBelow;
+                let doneKey = 'dawam_thumb_done', done = {};
+                try { done = JSON.parse(localStorage.getItem(doneKey) || '{}'); } catch (e) { done = {}; }
+                if (!weak && done[laborId]) return;
+                const thumb = PhotoUtils.makeThumb(canvas, detection.detection && detection.detection.box);
+                TerminalAPI.refreshFace(laborId, weak ? 'face' : 'thumb', thumb, weak ? detection.descriptor : null, confidence).then(res => {
+                    // photo is in the database now (thumb mode succeeded, or the face refresh was stored): do not send again from this device
+                    if (res && res.success && (!weak || res.updated)) { done[laborId] = 1; try { localStorage.setItem(doneKey, JSON.stringify(done)); } catch (e) {} }
+                }).catch(() => {});
+            } catch (e) { /* never disturb the punch */ }
         }
 
         // Show a full-screen result: kind = info | success (IN) | out (OUT) | warn | error
@@ -1570,7 +1590,7 @@ localStorage.setItem('pwa_client_code', clientCode);
             updateLocationBar('Offline mode - Punches will sync later', true);
         });
     </script>
-    <script src="../js/ui/app-update.js?v=90"></script>
-    <script src="../js/ui/pwa-install.js?v=90"></script>
+    <script src="../js/ui/app-update.js?v=91"></script>
+    <script src="../js/ui/pwa-install.js?v=91"></script>
 </body>
 </html>

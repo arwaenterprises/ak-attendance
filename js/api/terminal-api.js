@@ -130,6 +130,16 @@ const TerminalAPI = {
         return error ? { success: false, error: this._fail(error) } : { success: true, needsReenrollment: !!(data && data.needs_reenrollment) };
     },
 
+    // After an accepted punch: keep the labor's small photo / saved face fresh (the database decides whether anything changes)
+    //   mode 'thumb': only the small photo (when the labor has none yet)   mode 'face': a weaker but accepted match, replace saved face + photo
+    async refreshFace(laborId, mode, thumb, descriptor, confidence) {
+        const { data, error } = await this._rpc('terminal_refresh_face', {
+            p_labor_id: laborId, p_mode: mode, p_thumb: thumb,
+            p_descriptor: descriptor ? Array.from(descriptor) : null, p_confidence: Math.round(confidence)
+        });
+        return error ? { success: false, error: this._fail(error) } : { success: true, updated: !!(data && data.updated), reason: data && data.reason };
+    },
+
     // Locations come from the copy kept on the device (loaded at start-up and on every sync)
     async findNearestLocation(userLat, userLng, departmentId) {
         const locations = await OfflineStorage.getPunchLocations();

@@ -326,13 +326,14 @@ const LaborAPI = {
     },
 
     // Update face enrollment
-    async updateFaceEnrollment(laborId, faceDescriptor) {
+    async updateFaceEnrollment(laborId, faceDescriptor, faceThumb) {
         try {
             const { data, error } = await supabaseClient
                 .from('laborers')
                 .update({
                     face_enrolled: true,
                     face_descriptor: faceDescriptor,
+                    ...(faceThumb ? { face_thumb: faceThumb } : {}),
                     enrollment_date: new Date().toISOString(),
                     needs_reenrollment: false,
                     low_confidence_count: 0

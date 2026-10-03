@@ -158,12 +158,12 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="../js/config/supabase.js?v=90"></script>
-    <script src="../js/auth/auth.js?v=90"></script>
-    <script src="../js/utils/date-utils.js?v=90"></script>
-    <script src="../js/ui/sync-indicator.js?v=90"></script>
-    <script src="../js/ui/toast.js?v=90"></script>
-    <script src="../js/api/labor-api.js?v=90"></script>
+    <script src="../js/config/supabase.js?v=91"></script>
+    <script src="../js/auth/auth.js?v=91"></script>
+    <script src="../js/utils/date-utils.js?v=91"></script>
+    <script src="../js/ui/sync-indicator.js?v=91"></script>
+    <script src="../js/ui/toast.js?v=91"></script>
+    <script src="../js/api/labor-api.js?v=91"></script>
 
     <script>
         // Require login
@@ -317,7 +317,7 @@
                 
                 const faceDescriptor = Array.from(detection.descriptor);
                 
-                const saveResult = await LaborAPI.updateFaceEnrollment(laborId, faceDescriptor);
+                const saveResult = await LaborAPI.updateFaceEnrollment(laborId, faceDescriptor, PhotoUtils.makeThumb(canvas, detection.detection && detection.detection.box));
 
                 if (!saveResult.success) {
                     throw new Error(saveResult.error || 'Failed to save enrollment');
@@ -350,6 +350,6 @@
         // Start initialization
         init();
     </script>
-    <script src="../js/ui/app-update.js?v=90"></script>
+    <script src="../js/ui/app-update.js?v=91"></script>
 </body>
-</html>
+</html>
