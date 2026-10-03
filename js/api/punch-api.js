@@ -194,13 +194,8 @@ const PunchAPI = {
 
             if (error) throw error;
 
-            // New login: the stored value is the file path (shown later through a signed link); old login: the public web address
-            if (newLogin) return { success: true, url: filePath };
-            const { data: urlData } = supabaseClient.storage
-                .from('punch-photos')
-                .getPublicUrl(filePath);
-
-            return { success: true, url: urlData.publicUrl };
+            // The stored value is the file path (shown later through a signed link)
+            return { success: true, url: filePath };
         } catch (error) {
             console.error('Upload photo error:', error);
             return { success: false, error: error.message };

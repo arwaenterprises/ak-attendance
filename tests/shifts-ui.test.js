@@ -66,6 +66,17 @@ const LABOR = 'SHF' + rid;
     await page.click('#tabBtnHistory');
     await page.waitForFunction((L) => document.getElementById('historyTable').innerText.includes(L), LABOR, { timeout: 15000 });
   });
+  await test('a stale saved shift on the labor (database date differs from the admin date) does not hide the move: Assign list and Labor Master still show Night', async () => {
+    await page.evaluate(async (L) => {
+      const day = (await supabaseClient.from('shifts').select('id').eq('code', 'DAY').eq('client_id', AUTH.getClientId()).single()).data.id;
+      await supabaseClient.from('laborers').update({ shift_id: day }).eq('labor_id', L).eq('client_id', AUTH.getClientId());
+    }, LABOR);
+    await page.reload(); await page.click('#tabBtnAssign'); await page.fill('#fId', LABOR);
+    await page.waitForFunction(() => document.querySelectorAll('#laborTable tr').length === 1 && /Night shift/.test(document.getElementById('laborTable').innerText), null, { timeout: 20000 });
+    await page.goto(url + '/labor/master.html');
+    await page.waitForFunction((L) => [...document.querySelectorAll('tbody tr')].some(r => r.innerText.includes(L) && /Night shift/.test(r.innerText)), LABOR, { timeout: 30000 });
+    await page.goto(url + '/admin/shifts.html'); await page.waitForFunction(() => document.querySelectorAll('#shiftTable tr').length === 2, null, { timeout: 20000 });
+  });
   await test('the Night shift cannot be switched off while a labor is on it', async () => {
     await page.click('#tabBtnShifts');
     await page.click('#shiftTable tr:nth-child(2) button');
