@@ -43,7 +43,12 @@ const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.get
     const cid = AUTH.getClientId();
     const mk = (date, fi, lo, h, st) => ({ labor_id: a.L, department_id: a.dept, date, first_login: fi, last_logout: lo, total_hours: h, auto_status: st, client_id: cid });
     const r1 = await supabaseClient.from('daily_attendance').insert([mk(a.d1, '06:00', '16:00', 10, 'P'), mk(a.d2, '06:00', '10:00', 4, 'H'), mk(a.d3, null, null, 0, 'A'), mk(a.prev, '06:00', '15:00', 9, 'P')]);
-    const r3 = await supabaseClient.from('punch_records').insert({ labor_id: a.L, department_id: a.dept, date: a.d1, time: '06:15:00', type: 'login', location_name: 'Gate', client_id: cid });
+    // day 1: IN 06:15, OUT 10:30, IN 11:00, OUT 16:00 (two sessions)
+    const r3 = await supabaseClient.from('punch_records').insert([
+      { labor_id: a.L, department_id: a.dept, date: a.d1, time: '06:15:00', type: 'login', location_name: 'Gate', client_id: cid },
+      { labor_id: a.L, department_id: a.dept, date: a.d1, time: '10:30:00', type: 'logout', location_name: 'Gate', client_id: cid },
+      { labor_id: a.L, department_id: a.dept, date: a.d1, time: '11:00:00', type: 'login', location_name: 'Gate', client_id: cid },
+      { labor_id: a.L, department_id: a.dept, date: a.d1, time: '16:00:00', type: 'logout', location_name: 'Gate', client_id: cid }]);
     if (r3.error) return { e1: r3.error.message };
     const r2 = await supabaseClient.from('holidays').upsert({ client_id: cid, date: a.hol, name: 'Test holiday' }, { onConflict: 'client_id,date' });
     return { e1: r1.error && r1.error.message, e2: r2.error && r2.error.message };
@@ -71,15 +76,23 @@ const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.get
     await page.waitForFunction(() => document.getElementById('attendanceModal').classList.contains('active') && document.querySelectorAll('#calGrid .cal-day').length > 0, null, { timeout: 30000 });
     ok(new RegExp(LABOR).test(await page.locator('#attendanceInfo').innerText()), 'the screen shows this labor: ' + await page.locator('#attendanceInfo').innerText());
     eq(await page.locator('#monthTitle').innerText(), now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }));
-    const totals = await page.locator('#monthTotals').innerText();
-    ok(/1\s*Present/.test(totals) && /1\s*Half day/.test(totals) && /1\s*Absent/.test(totals) && /14h/.test(totals), 'totals: ' + JSON.stringify(totals) + ' cells: ' + JSON.stringify(await page.evaluate(() => [...document.querySelectorAll("#calGrid .cal-day")].filter(b => b.className.trim() !== 'cal-day').map(b => b.dataset.date + ':' + b.className))));
+    eq(await page.locator('#monthTotals').count(), 0); eq(await page.locator('.cal-legend').count(), 0);   // no totals tiles, no legend (the letters are on the days)
     eq(await page.locator('#calGrid .cal-day.p').count(), 1); eq(await page.locator('#calGrid .cal-day.h').count(), 1);
     eq(await page.locator('#calGrid .cal-day.a').count(), 1); eq(await page.locator('#calGrid .cal-day.o').count(), 1);
   });
-  await test('tapping a day lists its punches (IN with the time)', async () => {
+  await test('tapping a day shows its punches as two tiles per row, and the worked hours next to the date', async () => {
     await page.click('#calGrid .cal-day[data-date="' + ymd(thisStart) + '"]');
-    await page.waitForFunction(() => /IN/.test(document.getElementById('attendanceList').innerText), null, { timeout: 15000 }).catch(async () => { throw new Error('list shows: ' + JSON.stringify(await page.locator('#attendanceList').innerText()) + ' title: ' + await page.locator('#dayTitle').innerText()); });
-    ok(/06:15|6:15/.test(await page.locator('#attendanceList').innerText()), await page.locator('#attendanceList').innerText());
+    await page.waitForFunction(() => document.querySelectorAll('#attendanceList .punch-item').length === 4, null, { timeout: 15000 }).catch(async () => { throw new Error('list shows: ' + JSON.stringify(await page.locator('#attendanceList').innerText()) + ' title: ' + await page.locator('#dayTitle').innerText()); });
+    const txt = await page.locator('#attendanceList').innerText();
+    ok(/06:15|6:15/.test(txt) && /4:00|16:00/.test(txt), txt);
+    const tops = await page.evaluate(() => [...document.querySelectorAll('#attendanceList .punch-item')].map(e => Math.round(e.getBoundingClientRect().top)));
+    ok(tops[0] === tops[1] && tops[2] === tops[3] && tops[2] > tops[0], '2 x 2 tiles: ' + JSON.stringify(tops));
+    const title = await page.locator('#dayTitle').innerText();
+    ok(/9h 45m worked/.test(title), 'first IN 06:15 to last OUT 16:00 = 9h 45m: ' + JSON.stringify(title));
+  });
+  await test('the Close button shows the whole word "Close" (not cut off)', async () => {
+    const c = await page.evaluate(() => { const e = document.querySelector('.attendance-close'), b = e.getBoundingClientRect(); return { w: b.width, scrollW: e.scrollWidth, right: b.right, vw: window.innerWidth }; });
+    ok(c.scrollW <= Math.ceil(c.w) + 1 && c.right <= c.vw, JSON.stringify(c));
   });
   await test('the next-month button is off (nothing after this month); the previous month opens with its own data', async () => {
     ok(await page.locator('#monthNext').isDisabled()); ok(await page.locator('#monthPrev').isEnabled());
@@ -87,7 +100,6 @@ const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.get
     const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     await page.waitForFunction((t) => document.getElementById('monthTitle').innerText === t && document.querySelectorAll('#calGrid .cal-day.p').length === 1, prev.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }), { timeout: 15000 });
     ok(await page.locator('#monthPrev').isDisabled(), 'no month before the previous one'); ok(await page.locator('#monthNext').isEnabled());
-    ok(/1\s*Present/.test(await page.locator('#monthTotals').innerText()));
   });
   await test('Close brings the punch screen back (ID box and IN / OUT visible, modal hidden)', async () => {
     await page.click('.attendance-close');
