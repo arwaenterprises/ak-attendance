@@ -93,6 +93,14 @@ const JPEG_B64 = fs.readFileSync(__dirname + '/photos.test.js', 'utf8').match(/J
     const w = await tr(STRONG).locator('img.labor-thumb').evaluate(i => i.naturalWidth);
     ok(w > 0, 'photo did not load');
   });
+  await test('an empty small photo is filled by itself from the labor\'s latest punch photo when Labor Master opens', async () => {
+    await admin.evaluate(async (id) => { await supabaseClient.from('laborers').update({ face_thumb: null }).eq('labor_id', id); }, STRONG);
+    eq((await row(STRONG)).thumb, null);
+    await admin.goto(url + '/labor/master.html');
+    const r = await until(async () => { const x = await row(STRONG); return x.thumb ? x : null; }, 30000);
+    ok(r && /^data:image\/jpeg;base64,/.test(r.thumb), 'photo was not filled from the punch photo');
+    await admin.waitForFunction((id) => { const t = Array.from(document.querySelectorAll('#laborTable tr')).find(r => r.innerText.includes(id)); return t && t.querySelector('img.labor-thumb'); }, STRONG, { timeout: 15000 });
+  });
   await test('no script errors', async () => { eq(errors, []); });
 
   await browser.close(); srv.close();
