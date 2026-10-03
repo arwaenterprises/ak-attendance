@@ -39,7 +39,9 @@ const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.get
       { labor_id: a.LN, department_id: d.data.id, date: a.day, time: '06:00:00', type: 'login', client_id: cid, early_out: false },
       { labor_id: a.LN, department_id: d.data.id, date: a.day, time: '11:00:00', type: 'logout', client_id: cid, early_out: true, early_minutes: 270 },
       { labor_id: a.LD, department_id: d.data.id, date: a.day, time: '06:00:00', type: 'login', client_id: cid, early_out: false },
-      { labor_id: a.LD, department_id: d.data.id, date: a.day, time: '16:30:00', type: 'logout', client_id: cid, early_out: false }];
+      { labor_id: a.LD, department_id: d.data.id, date: a.day, time: '16:30:00', type: 'logout', client_id: cid, early_out: false },
+      // a second session started after the OUT (migration 016): the day still ends at the OUT
+      { labor_id: a.LD, department_id: d.data.id, date: a.day, time: '17:00:00', type: 'login', client_id: cid, early_out: false }];
     const p = await supabaseClient.from('punch_records').insert(rows);
     return { err: [e1, e2, mv.error, p.error].filter(Boolean).map(e => e.message), dept: d.data.id };
   }, [{ LN, LD, day, twoDaysAgo: ymd(new Date(Date.now() - 2 * 86400000)) }]);
@@ -66,6 +68,7 @@ const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.get
     const tn = await rowN.innerText(), td = await rowD.innerText();
     ok(/Night shift/.test(tn), tn); ok(/Early/.test(tn) && /4h 30m/.test(tn), 'early mark: ' + tn);
     ok(/Day shift/.test(td) && !/Early/.test(td), td);
+    ok(/16:30/.test(td) && !/17:00/.test(td), 'last logout must stay the OUT, not the open second IN: ' + td);
   });
   await test('Daily report: the Shift filter keeps only the chosen shift', async () => {
     await page.selectOption('#cfShift', { label: 'Night shift' });
