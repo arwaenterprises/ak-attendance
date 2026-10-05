@@ -30,6 +30,7 @@
                             <th>Department Name</th>
                             <th>Min Hours (Full Day)</th>
                             <th>Status</th>
+                            <th>Active labors</th>
                             <th>Created</th>
                             <th>Actions</th>
                         </tr>
@@ -46,11 +47,12 @@
                             </th>
                             <th></th>
                             <th></th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody id="departmentTable">
                         <tr>
-                            <td colspan="6" class="text-center p-20">Loading...</td>
+                            <td colspan="7" class="text-center p-20">Loading...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -86,6 +88,7 @@
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
                     </select>
+                    <small id="deptStatusHint" style="color:#c53030; display:none;"></small>
                 </div>
             </div>
             <div class="modal-footer">
@@ -95,16 +98,42 @@
         </div>
     </div>
 
+    <!-- Move labors -->
+    <div class="modal-overlay" id="moveModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="moveTitle">Move labors</h2>
+                <button type="button" class="modal-close" onclick="closeMoveModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="moveFromId">
+                <div class="form-group">
+                    <label>Move to department *</label>
+                    <select id="moveToDept" class="form-control"></select>
+                    <small style="color:#666;">The labors will punch at the locations of the new department. Their old attendance stays as it is.</small>
+                </div>
+                <div class="form-group">
+                    <label><input type="checkbox" id="moveAll" checked onchange="toggleMoveAll(this.checked)"> <strong>Select all</strong> <span id="moveCount" style="color:#666;"></span></label>
+                    <div id="moveList" style="max-height:260px; overflow:auto; border:1px solid #e2e8f0; border-radius:8px; padding:8px;"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeMoveModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" id="moveBtn" onclick="moveSelected()">Move selected</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Supabase JS -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="../js/config/supabase.js?v=98"></script>
-    <script src="../js/auth/auth.js?v=98"></script>
-    <script src="../js/utils/date-utils.js?v=98"></script>
-    <script src="../js/ui/sync-indicator.js?v=98"></script>
-    <script src="../js/ui/toast.js?v=98"></script>
-    <script src="../js/api/department-api.js?v=98"></script>
+    <script src="../js/config/supabase.js?v=99"></script>
+    <script src="../js/auth/auth.js?v=99"></script>
+    <script src="../js/utils/date-utils.js?v=99"></script>
+    <script src="../js/ui/sync-indicator.js?v=99"></script>
+    <script src="../js/ui/toast.js?v=99"></script>
+    <script src="../js/api/department-api.js?v=99"></script>
 
     <script>
         // Require Admin
@@ -113,6 +142,8 @@
         }
 
         let departments = [];
+        let laborCounts = {};
+        const esc = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
         // Format time for display (HH:MM)
         function formatMinHours(timeStr) {
@@ -124,7 +155,8 @@
         async function loadDepartments() {
             try {
                 SyncIndicator.show('Loading departments...');
-                const result = await DepartmentAPI.getAll();
+                const [result, counts] = await Promise.all([DepartmentAPI.getAll(), DepartmentAPI.getActiveLaborCounts()]);
+                laborCounts = counts.success ? counts.data : {};
                 if (result.success) {
                     departments = result.data;
                     renderTable(departments);
@@ -136,7 +168,7 @@
                 SyncIndicator.hide();
                 Toast.error('Failed to load departments: ' + error.message);
                 document.getElementById('departmentTable').innerHTML = `
-                    <tr><td colspan="6" class="text-center p-20 text-danger">
+                    <tr><td colspan="7" class="text-center p-20 text-danger">
                         ❌ Failed to load. Check internet connection.
                     </td></tr>
                 `;
@@ -164,7 +196,7 @@
 
             if (data.length === 0) {
                 tbody.innerHTML = `
-                    <tr><td colspan="6" class="text-center p-20 text-muted">
+                    <tr><td colspan="7" class="text-center p-20 text-muted">
                         No departments found. Click "Add Department" to create one.
                     </td></tr>
                 `;
@@ -181,9 +213,11 @@
                             ${dept.status}
                         </span>
                     </td>
+                    <td><strong>${laborCounts[dept.id] || 0}</strong></td>
                     <td>${DateUtils.formatDate(dept.created_at)}</td>
                     <td>
                         <button class="btn btn-sm btn-primary" onclick="editDepartment('${dept.id}')">✏️ Edit</button>
+                        <button class="btn btn-sm btn-secondary" onclick="showMoveModal('${dept.id}')">↔️ Move labors</button>
                         <button class="btn btn-sm btn-danger" onclick="deleteDepartment('${dept.id}')">🗑️ Delete</button>
                     </td>
                 </tr>
@@ -198,6 +232,7 @@
             document.getElementById('deptCode').value = '';
             document.getElementById('deptMinHours').value = '09:30';
             document.getElementById('deptStatus').value = 'active';
+            updateStatusHint();
             document.getElementById('departmentModal').classList.add('active');
         }
 
@@ -212,8 +247,21 @@
             document.getElementById('deptCode').value = dept.code;
             document.getElementById('deptMinHours').value = formatMinHours(dept.min_hours_full_day);
             document.getElementById('deptStatus').value = dept.status;
+            updateStatusHint();
             document.getElementById('departmentModal').classList.add('active');
         }
+
+        // Warn in the window itself when the department is about to be switched off
+        function updateStatusHint() {
+            const hint = document.getElementById('deptStatusHint');
+            const dept = departments.find(d => d.id === document.getElementById('editId').value);
+            const n = dept ? (laborCounts[dept.id] || 0) : 0;
+            if (dept && dept.status === 'active' && document.getElementById('deptStatus').value === 'inactive') {
+                hint.textContent = n > 0 ? `All ${n} active labor${n > 1 ? 's' : ''} in this department will become inactive today (their last working day).` : 'This department has no active labors.';
+                hint.style.display = 'block';
+            } else { hint.style.display = 'none'; }
+        }
+        document.getElementById('deptStatus').addEventListener('change', updateStatusHint);
 
         // Close modal
         function closeModal() {
@@ -233,18 +281,28 @@
                 return;
             }
 
+            // Switching a department OFF also switches off all its active labors: two confirmations
+            const current = editId ? departments.find(d => d.id === editId) : null;
+            const switchingOff = !!current && current.status === 'active' && status === 'inactive';
+            const today = DepartmentAPI.localToday();
+            if (switchingOff) {
+                const n = laborCounts[editId] || 0;
+                if (!confirm(`Make department "${current.name}" inactive?\n\n${n} active labor${n === 1 ? '' : 's'} in it will become inactive too.\nTheir last working day will be ${DateUtils.formatDate(today)} (today).`)) return;
+                if (!confirm(`FINAL CONFIRMATION\n\n"${current.name}" and its ${n} active labor${n === 1 ? '' : 's'} will be switched off now.\nThey will no longer be able to punch.\n\nSwitch off?`)) return;
+            }
+
             try {
                 SyncIndicator.show(editId ? 'Updating...' : 'Creating...');
 
                 let result;
                 if (editId) {
-                    result = await DepartmentAPI.update(editId, { name, code, status, min_hours_full_day: minHours });
+                    result = await DepartmentAPI.update(editId, { name, code, status, min_hours_full_day: minHours, lastWorkingDate: today });
                 } else {
                     result = await DepartmentAPI.create({ name, code, status, min_hours_full_day: minHours });
                 }
 
                 if (result.success) {
-                    Toast.success(editId ? 'Department updated!' : 'Department created!');
+                    Toast.success(result.deactivated ? `Department switched off. ${result.deactivated.labors_deactivated} labor(s) made inactive.` : (editId ? 'Department updated!' : 'Department created!'));
                     closeModal();
                     loadDepartments();
                 } else {
@@ -256,6 +314,50 @@
                 SyncIndicator.hide();
                 Toast.error('Failed to save: ' + error.message);
             }
+        }
+
+        // ---------- Move labors to another department ----------
+        let moveLabors = [];
+        async function showMoveModal(id) {
+            const dept = departments.find(d => d.id === id);
+            if (!dept) return;
+            const targets = departments.filter(d => d.status === 'active' && d.id !== id);
+            if (!targets.length) { Toast.error('There is no other active department to move labors to'); return; }
+            SyncIndicator.show('Loading labors...');
+            const r = await DepartmentAPI.getActiveLabors(id);
+            SyncIndicator.hide();
+            if (!r.success) { Toast.error('Failed to load labors: ' + r.error); return; }
+            if (!r.data.length) { Toast.error('This department has no active labors'); return; }
+            moveLabors = r.data;
+            document.getElementById('moveFromId').value = id;
+            document.getElementById('moveTitle').textContent = 'Move labors from ' + dept.name;
+            document.getElementById('moveToDept').innerHTML = targets.map(d => `<option value="${esc(d.id)}">${esc(d.name)} (${esc(d.code)})</option>`).join('');
+            document.getElementById('moveList').innerHTML = moveLabors.map(l => `<label style="display:flex;gap:8px;padding:4px 2px;"><input type="checkbox" class="move-cb" value="${esc(l.labor_id)}" checked onchange="updateMoveCount()"> <strong>${esc(l.labor_id)}</strong> ${esc(l.name)}</label>`).join('');
+            document.getElementById('moveAll').checked = true;
+            updateMoveCount();
+            document.getElementById('moveModal').classList.add('active');
+        }
+        function closeMoveModal() { document.getElementById('moveModal').classList.remove('active'); }
+        function toggleMoveAll(on) { document.querySelectorAll('.move-cb').forEach(c => { c.checked = on; }); updateMoveCount(); }
+        function updateMoveCount() {
+            const n = document.querySelectorAll('.move-cb:checked').length;
+            document.getElementById('moveCount').textContent = `(${n} of ${moveLabors.length} selected)`;
+            document.getElementById('moveBtn').disabled = n === 0;
+        }
+        async function moveSelected() {
+            const ids = [...document.querySelectorAll('.move-cb:checked')].map(c => c.value);
+            const toId = document.getElementById('moveToDept').value, to = departments.find(d => d.id === toId);
+            if (!ids.length || !to) return;
+            if (!confirm(`Move ${ids.length} labor${ids.length === 1 ? '' : 's'} to "${to.name}"?`)) return;
+            try {
+                SyncIndicator.show('Moving...');
+                const r = await DepartmentAPI.moveLabors(ids, toId);
+                SyncIndicator.hide();
+                if (!r.success) throw new Error(r.error);
+                Toast.success(`Moved ${r.data.moved} labor${r.data.moved === 1 ? '' : 's'} to ${to.name}`);
+                closeMoveModal();
+                loadDepartments();
+            } catch (error) { SyncIndicator.hide(); Toast.error('Could not move: ' + error.message); }
         }
 
         // Delete department
@@ -287,6 +389,6 @@
         // Initialize
         loadDepartments();
     </script>
-    <script src="../js/ui/app-update.js?v=98"></script>
+    <script src="../js/ui/app-update.js?v=99"></script>
 </body>
 </html>

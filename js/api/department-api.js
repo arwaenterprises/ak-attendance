@@ -62,6 +62,7 @@ const DepartmentAPI = {
                     name: department.name.trim(),
                     code: department.code.toUpperCase().trim(),
                     status: department.status || 'active',
+                    ...(department.min_hours_full_day ? { min_hours_full_day: department.min_hours_full_day } : {}),
                     client_id: AUTH.getClientId()
                 })
                 .select()
@@ -95,7 +96,9 @@ const DepartmentAPI = {
                 .update({
                     name: updates.name?.trim(),
                     code: updates.code?.toUpperCase().trim(),
-                    status: updates.status
+                    // switching a department OFF is done by deactivate_department() below (its labors go with it), never by a plain status update
+                    status: (updates.status === 'inactive' && oldData && oldData.status === 'active') ? 'active' : updates.status,
+                    ...(updates.min_hours_full_day ? { min_hours_full_day: updates.min_hours_full_day } : {})
                 })
                 .eq('client_id', AUTH.getClientId())
                 .eq('id', id)
@@ -104,12 +107,82 @@ const DepartmentAPI = {
 
             if (error) throw error;
 
+            let deactivated = null;
+            if (updates.status === 'inactive' && oldData && oldData.status === 'active') {
+                const off = await this.deactivate(id, updates.lastWorkingDate);
+                if (!off.success) throw new Error(off.error);
+                deactivated = off.data;
+                data.status = 'inactive';
+            }
+
             // Audit log
             await AUTH.logAction('UPDATE', 'departments', id, oldData, data);
 
-            return { success: true, data };
+            return { success: true, data, deactivated };
         } catch (error) {
             console.error('Update department error:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    // The administrator's own calendar date (the database date can be a day away because of time zones)
+    localToday() {
+        const d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    },
+
+    // Switch a department off together with its active labors; their last working day is `dateStr` (default: today)
+    async deactivate(id, dateStr) {
+        try {
+            const { data, error } = await supabaseClient.rpc('deactivate_department', { p_dept: id, p_date: dateStr || this.localToday() });
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            console.error('Deactivate department error:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    // Number of ACTIVE labors per department: { departmentId: count }
+    async getActiveLaborCounts() {
+        try {
+            const counts = {};
+            for (let from = 0; ; from += 1000) {
+                const { data, error } = await supabaseClient.from('laborers').select('department_id')
+                    .eq('client_id', AUTH.getClientId()).eq('status', 'active').order('labor_id').range(from, from + 999);
+                if (error) throw error;
+                (data || []).forEach(l => { counts[l.department_id] = (counts[l.department_id] || 0) + 1; });
+                if (!data || data.length < 1000) break;
+            }
+            return { success: true, data: counts };
+        } catch (error) {
+            console.error('Labor counts error:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    // Active labors of one department (for the "Move labors" window)
+    async getActiveLabors(departmentId) {
+        try {
+            const { data, error } = await supabaseClient.from('laborers').select('labor_id, name')
+                .eq('client_id', AUTH.getClientId()).eq('department_id', departmentId).eq('status', 'active').order('labor_id').limit(2000);
+            if (error) throw error;
+            return { success: true, data: data || [] };
+        } catch (error) {
+            console.error('Get department labors error:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    // Move labors to another ACTIVE department (the database checks that you are the administrator of this company)
+    async moveLabors(laborIds, departmentId) {
+        try {
+            const { data, error } = await supabaseClient.rpc('move_labors_to_department', { p_labor_ids: laborIds, p_dept: departmentId });
+            if (error) throw error;
+            await AUTH.logAction('UPDATE', 'laborers', departmentId, null, { moved: laborIds, to_department: departmentId });
+            return { success: true, data };
+        } catch (error) {
+            console.error('Move labors error:', error);
             return { success: false, error: error.message };
         }
     },
