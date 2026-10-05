@@ -342,12 +342,12 @@
 
     <!-- Supabase JS -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="../js/config/supabase.js?v=99"></script>
-    <script src="../js/auth/auth.js?v=99"></script>
-    <script src="../js/utils/date-utils.js?v=99"></script>
-    <script src="../js/ui/sync-indicator.js?v=99"></script>
-    <script src="../js/ui/toast.js?v=99"></script>
-    <script src="../js/api/report-api.js?v=99"></script>
+    <script src="../js/config/supabase.js?v=100"></script>
+    <script src="../js/auth/auth.js?v=100"></script>
+    <script src="../js/utils/date-utils.js?v=100"></script>
+    <script src="../js/ui/sync-indicator.js?v=100"></script>
+    <script src="../js/ui/toast.js?v=100"></script>
+    <script src="../js/api/report-api.js?v=100"></script>
 
     <script>
         if (!AUTH.requireLogin()) {
@@ -407,27 +407,30 @@
         }
 
         async function loadOTRates() {
+            // the overtime rate is part of the role (Roles page); the default role's rate is used when a labor's role is not found
             const { data } = await supabaseClient
-                .from('ot_rates')
-                .select('role, rate_per_hour')
+                .from('roles')
+                .select('name, ot_rate_per_hour, is_default')
                 .eq('client_id', clientId);
 
             otRates = {};
             (data || []).forEach(r => {
-                otRates[r.role.toLowerCase()] = parseFloat(r.rate_per_hour);
+                otRates[r.name.toLowerCase().replace(/\s+/g, ' ').trim()] = parseFloat(r.ot_rate_per_hour);
+                if (r.is_default) otRates['__default'] = parseFloat(r.ot_rate_per_hour);
             });
         }
 
         function getOTRate(role) {
-            if (!role) return otRates['labor'] || 15;
+            if (!role) return otRates['__default'] !== undefined ? otRates['__default'] : 15;
             const key = role.toLowerCase().replace(/\s+/g, ' ').trim();
             // Try exact match first
             if (otRates[key] !== undefined) return otRates[key];
             // Try partial match (e.g. "team leader" matches "team lead")
             for (const [k, v] of Object.entries(otRates)) {
+                if (k.startsWith('__')) continue;
                 if (key.includes(k) || k.includes(key)) return v;
             }
-            return otRates['labor'] || 15;
+            return otRates['__default'] !== undefined ? otRates['__default'] : 15;
         }
 
         // ─── Load OT Data ───────────────────────────────────────
@@ -800,6 +803,6 @@
         // ─── Initialize ──────────────────────────────────────────
         init();
     </script>
-    <script src="../js/ui/app-update.js?v=99"></script>
+    <script src="../js/ui/app-update.js?v=100"></script>
 </body>
 </html>
