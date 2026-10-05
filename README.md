@@ -118,11 +118,11 @@ The first admin login is created by the platform owner (see `supabase/seed-stagi
 
 1. Login as Super Admin
 2. Create Departments (Admin → Departments)
-3. Create Users if needed (Admin → Users)
+3. Check the Roles (Admin → Roles): default salary and overtime rate per role
 4. Add Punch Locations (Attendance → Punch Locations)
 5. Add Laborers (Labor → Labor Master)
 6. Enroll Faces (Labor → Master → Enroll button)
-7. Open Punch Terminal for laborers to punch
+7. Give the laborers their punch link (Dashboard → Terminal Link: copy, WhatsApp or QR code)
 
 ## Browser Support
 

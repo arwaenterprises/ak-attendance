@@ -94,12 +94,12 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="js/config/supabase.js?v=100"></script>
-    <script src="js/auth/auth.js?v=100"></script>
-    <script src="js/utils/date-utils.js?v=100"></script>
-    <script src="js/ui/sync-indicator.js?v=100"></script>
-    <script src="js/ui/toast.js?v=100"></script>
-    <script src="js/api/report-api.js?v=100"></script>
+    <script src="js/config/supabase.js?v=101"></script>
+    <script src="js/auth/auth.js?v=101"></script>
+    <script src="js/utils/date-utils.js?v=101"></script>
+    <script src="js/ui/sync-indicator.js?v=101"></script>
+    <script src="js/ui/toast.js?v=101"></script>
+    <script src="js/api/report-api.js?v=101"></script>
 
     <script>
         // Require login
@@ -154,8 +154,7 @@
             // Common tiles for Admin and Supervisor
             tiles.push(
                 { title: 'Labor Master', desc: isAdmin ? 'Manage laborers' : 'View laborers', icon: '👥', link: 'labor/master.html', class: 'tile-blue' },
-                { title: 'Reports', desc: 'Attendance & LOP', icon: '📊', link: 'reports/daily.html', class: 'tile-green' },
-                { title: 'Punch Terminal', desc: 'Labor punch system', icon: '👆', link: `punch/index.html?client=${session.clientCode}`, class: 'tile-orange', target: '_blank' }
+                { title: 'Reports', desc: 'Attendance & LOP', icon: '📊', link: 'reports/daily.html', class: 'tile-green' }
             );
 
             // Permission-based tiles
@@ -264,8 +263,7 @@
             }
             
             actions.push(
-                `<button class="btn btn-secondary" onclick="location.href='reports/daily.html'">📊 Generate Report</button>`,
-                `<button class="btn btn-warning" onclick="window.open('punch/index.html?client=${session.clientCode}', '_blank')">👆 Open Punch Terminal</button>`
+                `<button class="btn btn-secondary" onclick="location.href='reports/daily.html'">📊 Generate Report</button>`
             );
 
             container.innerHTML = `
@@ -313,6 +311,6 @@
             }
         }
     </script>
-    <script src="js/ui/app-update.js?v=100"></script>
+    <script src="js/ui/app-update.js?v=101"></script>
 </body>
 </html>
