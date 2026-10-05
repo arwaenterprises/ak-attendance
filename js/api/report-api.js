@@ -725,11 +725,36 @@ const ReportAPI = {
                 return attendanceMap[`${laborId}_${dateStr}`]?.status || 'A';
             };
 
+            // Salary history ("from this date on"), so each day is paid with the salary valid on that day.
+            // Only administrators can read it; for anybody else the labor's current salary is used for the whole month.
+            const monthEndStr = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+            const salaryHistory = {};
+            try {
+                for (let from = 0; ; from += 1000) {
+                    const { data: sal, error: salError } = await supabaseClient
+                        .from('labor_salaries')
+                        .select('labor_id, from_date, monthly_salary')
+                        .eq('client_id', AUTH.getClientId())
+                        .lte('from_date', monthEndStr)
+                        .order('from_date', { ascending: true }).order('id')
+                        .range(from, from + 999);
+                    if (salError) throw salError;
+                    (sal || []).forEach(e => { (salaryHistory[e.labor_id] = salaryHistory[e.labor_id] || []).push({ from: e.from_date, amount: Number(e.monthly_salary) }); });
+                    if (!sal || sal.length < 1000) break;
+                }
+            } catch (e) { console.warn('Salary history not available, using the current salary', e); }
+            const salaryOn = (laborer, dateStr) => {
+                const list = salaryHistory[laborer.labor_id];
+                if (list) { let v = null; for (const e of list) { if (e.from <= dateStr) v = e.amount; else break; } if (v !== null) return v; }
+                return Number(laborer.monthly_salary) || 0;
+            };
+
             const reportData = laborers.map(laborer => {
                 const doj = new Date(laborer.date_of_joining);
                 const lastWorkingDate = laborer.last_working_date ? new Date(laborer.last_working_date) : null;
                 const minHours = deptMinHoursMap[laborer.department_id] || '09:30';
-                const monthlySalary = laborer.monthly_salary || 3000;
+                let salaryAccum = 0;                 // sum over the days of (paid part of the day x salary of that day)
+                const salaryValues = new Set();
 
                 const days = {};
                 let presentCount = 0;
@@ -783,6 +808,11 @@ const ReportAPI = {
                         else absentCount++;
                     }
 
+                    const paidPart = (status === 'P' || status === 'F' || status === 'NH') ? 1 : (status === 'H' ? 0.5 : 0);
+                    const salaryToday = salaryOn(laborer, dateStr);
+                    salaryValues.add(salaryToday);
+                    salaryAccum += paidPart * salaryToday;
+
                     days[day] = {
                         status: status,
                         in: this.formatTime12h(firstIn),
@@ -794,8 +824,9 @@ const ReportAPI = {
                 // P*1 + F*1 + NH*1 + H*0.5
                 const totalPaidDays = presentCount + fridayCount + holidayCount + (halfDayCount * 0.5);
 
-                // FIX 3: Salary based on actual days in month (28/29/30/31)
-                const calculatedSalary = Math.round((totalPaidDays / lastDay) * monthlySalary);
+                // Salary based on the actual days in the month (28/29/30/31); each day uses the salary valid on that day
+                const calculatedSalary = Math.round(salaryAccum / lastDay);
+                const monthlySalary = salaryOn(laborer, monthEndStr);     // shown: the salary at the end of the month
 
                 return {
                     laborId: laborer.labor_id,
@@ -805,6 +836,7 @@ const ReportAPI = {
                     lastWorkingDate: laborer.last_working_date,
                     role: laborer.role || 'Labor',
                     monthlySalary: monthlySalary,
+                    salaryChanged: salaryValues.size > 1,
                     days,
                     presentCount,
                     halfDayCount,

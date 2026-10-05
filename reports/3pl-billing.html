@@ -225,13 +225,13 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="../js/config/supabase.js?v=99"></script>
-    <script src="../js/auth/auth.js?v=99"></script>
-    <script src="../js/utils/date-utils.js?v=99"></script>
-    <script src="../js/ui/sync-indicator.js?v=99"></script>
-    <script src="../js/ui/toast.js?v=99"></script>
-    <script src="../js/api/department-api.js?v=99"></script>
-    <script src="../js/api/report-api.js?v=99"></script>
+    <script src="../js/config/supabase.js?v=100"></script>
+    <script src="../js/auth/auth.js?v=100"></script>
+    <script src="../js/utils/date-utils.js?v=100"></script>
+    <script src="../js/ui/sync-indicator.js?v=100"></script>
+    <script src="../js/ui/toast.js?v=100"></script>
+    <script src="../js/api/department-api.js?v=100"></script>
+    <script src="../js/api/report-api.js?v=100"></script>
 
     <script>
         if (!AUTH.requireLogin()) {
@@ -405,7 +405,8 @@
                             fridayCount: 0,
                             holidayCount: 0,
                             totalPaidDays: 0,
-                            calculatedSalary: 0
+                            calculatedSalary: 0,
+                            salaryChanged: false
                         });
                     }
                     const entry = laborMap.get(labor.laborId);
@@ -418,6 +419,8 @@
                     entry.holidayCount += labor.holidayCount || 0;
                     entry.totalPaidDays += labor.totalPaidDays;
                     entry.calculatedSalary += labor.calculatedSalary;
+                    // a salary that changed inside a month, or between the months of the report, cannot be written as one simple formula
+                    if (labor.salaryChanged || Number(labor.monthlySalary) !== Number(entry.monthlySalary)) entry.salaryChanged = true;
                 });
             });
 
@@ -664,7 +667,8 @@
                         { formula: countFormula('F') },
                         { formula: countFormula('NH') },
                         { formula: `${pCol}${currentRow}+${fCol}${currentRow}+${nhCol}${currentRow}+${hCol}${currentRow}*0.5` },
-                        { formula: `ROUND(${pdCol}${currentRow}/${allDays.length}*${labor.monthlySalary},0)` },
+                        // one simple formula while the salary stayed the same; otherwise the calculated amount (each day with the salary valid on that day)
+                        (labor.salaryChanged ? labor.calculatedSalary : { formula: `ROUND(${pdCol}${currentRow}/${allDays.length}*${labor.monthlySalary},0)` }),
                         ot.hours > 0 ? ot.hours : '',
                         ot.amount > 0 ? parseFloat(ot.amount.toFixed(2)) : ''
                     );
@@ -822,6 +826,6 @@
         setupMonthCheckboxes();
         loadDepartments();
     </script>
-    <script src="../js/ui/app-update.js?v=99"></script>
+    <script src="../js/ui/app-update.js?v=100"></script>
 </body>
 </html>

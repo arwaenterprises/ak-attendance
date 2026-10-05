@@ -148,6 +148,8 @@
             display: flex;
             gap: 8px;
         }
+            .no-salary .sal-col { display: none; }
+        .salary-note { color:#718096; font-size:12px; margin-top:4px; }
     </style>
 </head>
 <body>
@@ -182,6 +184,8 @@
                             <th>Date of Joining</th>
                             <th>Nationality</th>
                             <th>Department</th>
+                            <th>Role</th>
+                            <th class="sal-col">Salary</th>
                             <th>Shift</th>
                             <th>Status</th>
                             <th>Face</th>
@@ -200,6 +204,8 @@
                                     <option value="">All</option>
                                 </select>
                             </th>
+                            <th></th>
+                            <th class="sal-col"></th>
                             <th>
                                 <select class="col-filter" id="shiftFilter" onchange="applyFilters()">
                                     <option value="">All</option>
@@ -226,7 +232,7 @@
                     </thead>
                     <tbody id="laborTable">
                         <tr>
-                            <td colspan="12" class="text-center p-20">Loading...</td>
+                            <td colspan="14" class="text-center p-20">Loading...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -273,6 +279,22 @@
                     </div>
                     
                     <div class="form-group">
+                        <label>Role *</label>
+                        <select id="laborRole" class="form-control" onchange="roleChanged()"></select>
+                    </div>
+
+                    <div class="form-group" id="salaryGroup" style="display:none;">
+                        <label>Monthly salary (SAR)</label>
+                        <input type="number" id="laborSalary" class="form-control" min="0" step="1" oninput="salaryChanged()">
+                        <div class="salary-note" id="salaryHelp"></div>
+                        <div id="salaryFromGroup" style="display:none; margin-top:6px;">
+                            <label>The new salary applies from *</label>
+                            <input type="date" id="laborSalaryFrom" class="form-control">
+                            <div class="salary-note">Days before this date keep the old salary in every report.</div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
                         <label>Status</label>
                         <select id="laborStatus" class="form-control" onchange="toggleLastWorkingDate()">
                             <option value="active">Active</option>
@@ -289,6 +311,20 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="saveLabor()">💾 Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Salary history (administrator) -->
+    <div class="modal-overlay" id="salaryHistoryModal">
+        <div class="modal" style="max-width: 420px;">
+            <div class="modal-header">
+                <h2 id="salaryHistoryTitle">Salary history</h2>
+                <button type="button" class="modal-close" onclick="document.getElementById('salaryHistoryModal').classList.remove('active')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <table style="width:100%;"><thead><tr><th style="text-align:left;">From</th><th style="text-align:left;">Monthly salary (SAR)</th></tr></thead><tbody id="salaryHistoryRows"></tbody></table>
+                <div class="salary-note" style="margin-top:10px;">To change the salary, use Edit on the labor and choose the day it applies from.</div>
             </div>
         </div>
     </div>
@@ -363,17 +399,18 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="../js/config/supabase.js?v=99"></script>
-    <script src="../js/auth/auth.js?v=99"></script>
-    <script src="../js/utils/date-utils.js?v=99"></script>
-    <script src="../js/utils/csv-handler.js?v=99"></script>
-    <script src="../js/ui/sync-indicator.js?v=99"></script>
-    <script src="../js/ui/toast.js?v=99"></script>
-    <script src="../js/api/department-api.js?v=99"></script>
-    <script src="../js/api/labor-api.js?v=99"></script>
-    <script src="../js/api/shift-api.js?v=99"></script>
-    <script src="../js/utils/photo-url.js?v=99"></script>
-    <script src="../js/api/enrollment-api.js?v=99"></script>
+    <script src="../js/config/supabase.js?v=100"></script>
+    <script src="../js/auth/auth.js?v=100"></script>
+    <script src="../js/utils/date-utils.js?v=100"></script>
+    <script src="../js/utils/csv-handler.js?v=100"></script>
+    <script src="../js/ui/sync-indicator.js?v=100"></script>
+    <script src="../js/ui/toast.js?v=100"></script>
+    <script src="../js/api/department-api.js?v=100"></script>
+    <script src="../js/api/labor-api.js?v=100"></script>
+    <script src="../js/api/shift-api.js?v=100"></script>
+    <script src="../js/api/role-api.js?v=100"></script>
+    <script src="../js/utils/photo-url.js?v=100"></script>
+    <script src="../js/api/enrollment-api.js?v=100"></script>
 
     <script>
         // Require login
@@ -384,6 +421,10 @@
         const session = AUTH.getSession();
         let laborers = [];
         let departments = [];
+        let roles = [];
+        const isAdmin = session.role === 'admin';
+        if (!isAdmin) document.body.classList.add('no-salary');
+        let currentSalaryOfEdit = null;
         let filteredLaborers = [];
 
         // Check permissions for add/import
@@ -416,6 +457,12 @@
                     populateDepartmentDropdowns();
                 }
 
+                // Roles for the Role dropdown (the page still works if they cannot be read)
+                try {
+                    const roleResult = await RoleAPI.getActive();
+                    if (roleResult.success) { roles = roleResult.data; populateRoleDropdown(); }
+                } catch (e) { console.warn('Roles not available', e); }
+
                 // Load shifts (the page still works if they cannot be read)
                 try {
                     const shiftResult = await ShiftAPI.getAll();
@@ -429,6 +476,7 @@
                 const laborResult = await LaborAPI.getAll();
                 if (laborResult.success) {
                     try { await ShiftAPI.applyCurrentShift(laborResult.data); } catch (e) { /* keep the saved shift */ }
+                    if (isAdmin) { try { await SalaryAPI.applyCurrent(laborResult.data); } catch (e) { /* salary column stays empty */ } }
                     laborers = laborResult.data.sort((a, b) => {
                         const numA = parseInt(a.labor_id.replace('L', '')) || 0;
                         const numB = parseInt(b.labor_id.replace('L', '')) || 0;
@@ -444,7 +492,7 @@
                 SyncIndicator.hide();
                 Toast.error('Failed to load data: ' + error.message);
                 document.getElementById('laborTable').innerHTML = `
-                    <tr><td colspan="12" class="text-center p-20 text-danger">
+                    <tr><td colspan="14" class="text-center p-20 text-danger">
                         ❌ Failed to load. Check internet connection.
                     </td></tr>
                 `;
@@ -452,6 +500,43 @@
         }
 
         // Populate department dropdowns
+        function roleById(id) { return roles.find(r => r.id === id); }
+        function populateRoleDropdown(keepId) {
+            const sel = document.getElementById('laborRole');
+            const list = roles.slice();
+            sel.innerHTML = list.map(r => `<option value="${r.id}">${esc(r.name)}${r.is_default ? ' (default)' : ''}</option>`).join('');
+            const def = roles.find(r => r.is_default) || roles[0];
+            sel.value = keepId || (def ? def.id : '');
+        }
+        const esc = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const money = (n) => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
+        function localToday() { return RoleAPI.localToday(); }
+
+        // Role chosen: when adding a labor, show what salary it will get if none is typed
+        function roleChanged() {
+            if (document.getElementById('editLaborId').value) return;
+            const r = roleById(document.getElementById('laborRole').value);
+            document.getElementById('laborSalary').placeholder = r ? 'Default: ' + money(r.default_monthly_salary) : '';
+        }
+        // Salary typed on an existing labor: ask from which day
+        function salaryChanged() {
+            const editing = !!document.getElementById('editLaborId').value;
+            const v = document.getElementById('laborSalary').value.trim();
+            const changed = editing && v !== '' && currentSalaryOfEdit !== null && Number(v) !== Number(currentSalaryOfEdit);
+            document.getElementById('salaryFromGroup').style.display = changed ? 'block' : 'none';
+            if (changed && !document.getElementById('laborSalaryFrom').value) document.getElementById('laborSalaryFrom').value = localToday();
+        }
+        async function showSalaryHistory(laborId) {
+            const labor = laborers.find(l => l.labor_id === laborId);
+            document.getElementById('salaryHistoryTitle').textContent = 'Salary history - ' + (labor ? labor.name : laborId);
+            const rows = document.getElementById('salaryHistoryRows');
+            rows.innerHTML = '<tr><td colspan="2">Loading...</td></tr>';
+            document.getElementById('salaryHistoryModal').classList.add('active');
+            const r = await SalaryAPI.getHistory(laborId);
+            if (!r.success) { rows.innerHTML = '<tr><td colspan="2">Could not load</td></tr>'; return; }
+            rows.innerHTML = r.data.map(h => `<tr><td>${h.from_date === '2000-01-01' ? 'Start' : esc(DateUtils.formatDate(h.from_date))}</td><td><strong>${money(h.monthly_salary)}</strong></td></tr>`).join('') || '<tr><td colspan="2">No entries</td></tr>';
+        }
+
         function populateDepartmentDropdowns() {
             const filterSelect = document.getElementById('departmentFilter');
             const formSelect = document.getElementById('laborDepartment');
@@ -515,7 +600,7 @@
 
             if (filteredLaborers.length === 0) {
                 tbody.innerHTML = `
-                    <tr><td colspan="12" class="text-center p-20 text-muted">
+                    <tr><td colspan="14" class="text-center p-20 text-muted">
                         No laborers found. ${session.role !== 'supervisor' ? 'Click "Add Labor" to create one.' : ''}
                     </td></tr>
                 `;
@@ -546,7 +631,8 @@
                 // Edit/Delete for admin/super_admin
                 if (session.role !== 'supervisor') {
                     actions += `<button class="btn btn-sm btn-primary" onclick="editLabor('${labor.labor_id}')">✏️ Edit</button> `;
-                    actions += `<button class="btn btn-sm btn-danger" onclick="deleteLabor('${labor.labor_id}')">🗑️ Delete</button>`;
+                    actions += `<button class="btn btn-sm btn-danger" onclick="deleteLabor('${labor.labor_id}')">🗑️ Delete</button> `;
+                    if (isAdmin) actions += `<button class="btn btn-sm btn-secondary" onclick="showSalaryHistory('${labor.labor_id}')" title="Salary history">💰</button>`;
                 }
 
                 // Sync status
@@ -577,6 +663,8 @@
                         <td>${DateUtils.formatDate(labor.date_of_joining)}</td>
                         <td>${labor.nationality}</td>
                         <td>${labor.departments?.name || '-'}</td>
+                        <td>${esc(labor.role || '-')}</td>
+                        <td class="sal-col">${labor.current_salary != null ? money(labor.current_salary) : '-'}</td>
                         <td>${shiftBadgeHtml(labor.shift_id)}</td>
                         <td>
                             <span class="badge badge-${labor.status === 'active' ? 'active' : 'inactive'}">
@@ -601,6 +689,14 @@
             document.getElementById('laborDOJ').value = '';
             document.getElementById('laborNationality').value = '';
             document.getElementById('laborStatus').value = 'active';
+            populateRoleDropdown();
+            currentSalaryOfEdit = null;
+            document.getElementById('salaryGroup').style.display = isAdmin ? 'block' : 'none';
+            document.getElementById('laborSalary').value = '';
+            document.getElementById('salaryFromGroup').style.display = 'none';
+            document.getElementById('laborSalaryFrom').value = '';
+            document.getElementById('salaryHelp').textContent = 'Leave empty to use the default salary of the role.';
+            roleChanged();
             
             // Pre-select department for non-super-admin
             if (session.role !== 'admin' && session.departmentId) {
@@ -633,6 +729,15 @@
             document.getElementById('laborNationality').value = labor.nationality;
             document.getElementById('laborDepartment').value = labor.department_id;
             document.getElementById('laborStatus').value = labor.status;
+            if (labor.role_id && !roleById(labor.role_id)) { roles.push({ id: labor.role_id, name: labor.role || '(inactive role)', is_default: false }); }
+            populateRoleDropdown(labor.role_id);
+            currentSalaryOfEdit = labor.current_salary != null ? Number(labor.current_salary) : null;
+            document.getElementById('salaryGroup').style.display = isAdmin ? 'block' : 'none';
+            document.getElementById('laborSalary').value = currentSalaryOfEdit !== null ? currentSalaryOfEdit : '';
+            document.getElementById('laborSalary').placeholder = '';
+            document.getElementById('salaryFromGroup').style.display = 'none';
+            document.getElementById('laborSalaryFrom').value = '';
+            document.getElementById('salaryHelp').textContent = 'Current salary. To change it, type the new amount and choose the day it applies from.';
             document.getElementById('laborLastWorkingDate').value =
                 labor.last_working_date ? DateUtils.formatForInput(labor.last_working_date) : '';
             document.getElementById('lastPunchInfo').textContent = '';
@@ -670,6 +775,12 @@
             const departmentId = document.getElementById('laborDepartment').value;
             const status = document.getElementById('laborStatus').value;
             const lastWorkingDate = document.getElementById('laborLastWorkingDate').value || null;
+            const roleId = document.getElementById('laborRole').value || null;
+            const salaryRaw = document.getElementById('laborSalary').value.trim();
+            const salaryFrom = document.getElementById('laborSalaryFrom').value;
+            const salaryChangedNow = isAdmin && !!editLaborId && salaryRaw !== '' && currentSalaryOfEdit !== null && Number(salaryRaw) !== Number(currentSalaryOfEdit);
+            if (salaryRaw !== '' && !(Number(salaryRaw) >= 0)) { Toast.error('The salary must be a number, 0 or more'); return; }
+            if (salaryChangedNow && !salaryFrom) { Toast.error('Choose the day the new salary applies from'); return; }
 
             if (!name || !iqamaNumber || !dateOfJoining || !nationality || !departmentId) {
                 Toast.error('Please fill all required fields');
@@ -717,9 +828,14 @@
                         dateOfJoining,
                         nationality,
                         departmentId,
+                        roleId,
                         status,
                         lastWorkingDate: status === 'inactive' ? lastWorkingDate : null
                     });
+                    if (result.success && salaryChangedNow) {
+                        const sal = await SalaryAPI.setSalary([editLaborId], salaryRaw, salaryFrom);
+                        if (!sal.success) throw new Error('Labor saved, but the salary change failed: ' + sal.error);
+                    }
                 } else {
                     result = await LaborAPI.create({
                         name,
@@ -727,6 +843,8 @@
                         dateOfJoining,
                         nationality,
                         departmentId,
+                        roleId,
+                        monthlySalary: isAdmin && salaryRaw !== '' ? Number(salaryRaw) : null,
                         status
                     });
                 }
@@ -991,6 +1109,6 @@
         loadData();
         loadPendingCount();
     </script>
-    <script src="../js/ui/app-update.js?v=99"></script>
+    <script src="../js/ui/app-update.js?v=100"></script>
 </body>
 </html>

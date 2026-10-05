@@ -71,6 +71,8 @@ const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.get
     await page.click('#moveBtn');
     await page.waitForFunction(() => !document.getElementById('moveModal').classList.contains('active'), null, { timeout: 15000 });
     eq((await dbLabor(LB)).department_id, setup.d2); eq((await dbLabor(LA)).department_id, setup.d1);
+    // the page reloads the counts after a move: wait for it (on a slow machine the next step used to open the edit window before that)
+    await page.waitForFunction((id) => laborCounts[id] === 1, setup.d1, { timeout: 20000 });
   });
 
   await test('switching a department off: cancelling the second confirmation changes nothing', async () => {

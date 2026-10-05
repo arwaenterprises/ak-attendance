@@ -47,6 +47,7 @@ const CSVHandler = {
                     dateOfJoining: this.parseDate(row.date_of_joining),
                     departmentCode: row.department_code.toUpperCase(),
                     status: (row.status || 'active').toLowerCase(),
+                    roleName: (row.role || '').trim(),
                     monthlySalary: row.monthly_salary ? parseInt(row.monthly_salary) : null
                 });
             }

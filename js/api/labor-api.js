@@ -162,8 +162,9 @@ const LaborAPI = {
                     date_of_joining: laborer.dateOfJoining,
                     department_id: laborer.departmentId,
                     status: (laborer.status || 'active').toLowerCase(),
-                    role: laborer.role || 'Labor',
-                    monthly_salary: laborer.monthlySalary || 3000,
+                    // the role (the database gives the company's default role when none is chosen); the salary typed here, else the role's default salary
+                    role_id: laborer.roleId || null,
+                    monthly_salary: (laborer.monthlySalary === null || laborer.monthlySalary === undefined || laborer.monthlySalary === '' || isNaN(Number(laborer.monthlySalary))) ? null : Number(laborer.monthlySalary),
                     face_enrolled: false,
                     needs_reenrollment: false,
                     low_confidence_count: 0,
@@ -210,8 +211,8 @@ const LaborAPI = {
             if (updates.needsReenrollment !== undefined) updateObj.needs_reenrollment = updates.needsReenrollment;
             if (updates.lowConfidenceCount !== undefined) updateObj.low_confidence_count = updates.lowConfidenceCount;
             if (updates.lastLowConfidenceDate) updateObj.last_low_confidence_date = updates.lastLowConfidenceDate;
-            if (updates.role !== undefined) updateObj.role = updates.role;
-            if (updates.monthlySalary !== undefined) updateObj.monthly_salary = updates.monthlySalary;
+            if (updates.roleId) updateObj.role_id = updates.roleId;
+            // (a salary change goes through SalaryAPI.setSalary, which keeps the history and asks from which day)
             if (updates.lastWorkingDate !== undefined) updateObj.last_working_date = updates.lastWorkingDate;
 
             const { data, error } = await supabaseClient

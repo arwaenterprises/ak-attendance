@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dawam Attendance - Roles</title>
+    <link rel="stylesheet" href="../css/main.css">
+    <style>
+        .hint { color: #718096; font-size: 13px; }
+        .badge-default { background: #bee3f8; color: #2a4365; }
+        .salary-box { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; margin-top: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏷️ Roles</h1>
+            <div class="header-actions">
+                <button type="button" class="btn btn-secondary" onclick="location.href='../dashboard.html'">← Dashboard</button>
+            </div>
+        </div>
+
+        <div class="action-bar">
+            <div class="action-buttons">
+                <button type="button" class="btn btn-primary" onclick="showAddModal()">➕ Add Role</button>
+            </div>
+        </div>
+
+        <div class="content">
+            <p class="hint">Every labor has a role. A role holds the default monthly salary and the overtime rate per hour. A new labor gets the salary typed at creation, or the default salary of its role when none is typed. The role marked <strong>Default</strong> is used when no role is chosen.</p>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Role</th>
+                            <th>Default monthly salary (SAR)</th>
+                            <th>Overtime (SAR / hour)</th>
+                            <th>Active labors</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="roleTable">
+                        <tr><td colspan="6" class="text-center p-20">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add / edit role -->
+    <div class="modal-overlay" id="roleModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="modalTitle">Add Role</h2>
+                <button type="button" class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editId">
+                <div class="form-group">
+                    <label>Role name *</label>
+                    <input type="text" id="roleName" class="form-control" maxlength="60" placeholder="e.g., Driver">
+                </div>
+                <div class="form-group">
+                    <label>Default monthly salary (SAR) *</label>
+                    <input type="number" id="roleSalary" class="form-control" min="0" step="1" placeholder="e.g., 2500">
+                    <small class="hint" id="salaryHint"></small>
+                </div>
+                <div class="form-group">
+                    <label>Overtime rate (SAR per hour)</label>
+                    <input type="number" id="roleOT" class="form-control" min="0" step="0.5" placeholder="e.g., 15">
+                </div>
+                <div class="form-group" id="statusGroup">
+                    <label>Status</label>
+                    <select id="roleStatus" class="form-control"><option value="active">Active</option><option value="inactive">Inactive (hidden when choosing a role)</option></select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveRole()">💾 Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- From which day does the new salary apply -->
+    <div class="modal-overlay" id="salaryModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>New default salary</h2>
+                <button type="button" class="modal-close" onclick="closeSalaryModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="salarySummary"></p>
+                <div class="form-group">
+                    <label>From which day does it apply? *</label>
+                    <input type="date" id="salaryFrom" class="form-control">
+                    <small class="hint">Days before this date keep their old salary in every report.</small>
+                </div>
+                <div class="salary-box">
+                    <label style="display:flex; gap:8px; align-items:flex-start;">
+                        <input type="checkbox" id="salaryApply" checked>
+                        <span><strong>Also change the salary of the labors who are on the current default</strong><br>
+                        <span class="hint" id="salaryApplyHint"></span></span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeSalaryModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" id="salaryOk" onclick="confirmSalary()">Apply</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- App Scripts -->
+    <script src="../js/config/supabase.js?v=100"></script>
+    <script src="../js/auth/auth.js?v=100"></script>
+    <script src="../js/utils/date-utils.js?v=100"></script>
+    <script src="../js/ui/sync-indicator.js?v=100"></script>
+    <script src="../js/ui/toast.js?v=100"></script>
+    <script src="../js/api/role-api.js?v=100"></script>
+
+    <script>
+        if (!AUTH.requireRole(['admin'])) { /* redirect handled by requireRole */ }
+
+        let roles = [], counts = {}, pendingSalary = null;
+        const esc = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const money = (n) => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
+
+        async function loadRoles() {
+            try {
+                SyncIndicator.show('Loading roles...');
+                const [r, c] = await Promise.all([RoleAPI.getAll(), RoleAPI.getLaborCounts()]);
+                SyncIndicator.hide();
+                if (!r.success) throw new Error(r.error);
+                roles = r.data; counts = c.success ? c.data : {};
+                renderTable();
+            } catch (e) {
+                SyncIndicator.hide();
+                Toast.error('Failed to load roles: ' + e.message);
+                document.getElementById('roleTable').innerHTML = '<tr><td colspan="6" class="text-center p-20 text-danger">Failed to load. Check internet connection.</td></tr>';
+            }
+        }
+
+        function renderTable() {
+            const tb = document.getElementById('roleTable');
+            if (!roles.length) { tb.innerHTML = '<tr><td colspan="6" class="text-center p-20 text-muted">No roles yet. Click "Add Role".</td></tr>'; return; }
+            tb.innerHTML = roles.map(r => `
+                <tr>
+                    <td><strong>${esc(r.name)}</strong> ${r.is_default ? '<span class="badge badge-default">Default</span>' : ''}</td>
+                    <td><strong>${money(r.default_monthly_salary)}</strong></td>
+                    <td>${money(r.ot_rate_per_hour)}</td>
+                    <td>${(counts[r.id] && counts[r.id].active) || 0}</td>
+                    <td><span class="badge badge-${r.status === 'active' ? 'active' : 'inactive'}">${esc(r.status)}</span></td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-primary" onclick="editRole('${esc(r.id)}')">✏️ Edit</button>
+                        ${r.is_default ? '' : `<button type="button" class="btn btn-sm btn-secondary" onclick="makeDefault('${esc(r.id)}')">Make default</button>
+                        <button type="button" class="btn btn-sm btn-danger" onclick="deleteRole('${esc(r.id)}')">🗑️ Delete</button>`}
+                    </td>
+                </tr>`).join('');
+        }
+
+        function showAddModal() {
+            document.getElementById('modalTitle').textContent = 'Add Role';
+            document.getElementById('editId').value = '';
+            document.getElementById('roleName').value = '';
+            document.getElementById('roleSalary').value = '';
+            document.getElementById('roleOT').value = '';
+            document.getElementById('roleStatus').value = 'active';
+            document.getElementById('statusGroup').style.display = 'none';
+            document.getElementById('salaryHint').textContent = '';
+            document.getElementById('roleModal').classList.add('active');
+        }
+        function editRole(id) {
+            const r = roles.find(x => x.id === id); if (!r) return;
+            document.getElementById('modalTitle').textContent = 'Edit Role';
+            document.getElementById('editId').value = r.id;
+            document.getElementById('roleName').value = r.name;
+            document.getElementById('roleSalary').value = r.default_monthly_salary;
+            document.getElementById('roleOT').value = r.ot_rate_per_hour;
+            document.getElementById('roleStatus').value = r.status;
+            document.getElementById('statusGroup').style.display = r.is_default ? 'none' : 'block';
+            document.getElementById('salaryHint').textContent = 'If you change this, you will be asked from which day it applies.';
+            document.getElementById('roleModal').classList.add('active');
+        }
+        function closeModal() { document.getElementById('roleModal').classList.remove('active'); }
+
+        async function saveRole() {
+            const id = document.getElementById('editId').value;
+            const name = document.getElementById('roleName').value.trim();
+            const salaryRaw = document.getElementById('roleSalary').value.trim();
+            const ot = document.getElementById('roleOT').value.trim();
+            const status = document.getElementById('roleStatus').value;
+            if (!name || salaryRaw === '') { Toast.error('Please fill the role name and the default salary'); return; }
+            const salary = Number(salaryRaw);
+            if (!(salary >= 0) || (ot !== '' && !(Number(ot) >= 0))) { Toast.error('Salary and overtime rate must be numbers, 0 or more'); return; }
+            try {
+                SyncIndicator.show('Saving...');
+                if (!id) {
+                    const r = await RoleAPI.create({ name, defaultSalary: salary, otRate: ot === '' ? 0 : ot });
+                    SyncIndicator.hide();
+                    if (!r.success) throw new Error(r.error);
+                    Toast.success('Role added'); closeModal(); loadRoles(); return;
+                }
+                const old = roles.find(x => x.id === id);
+                const r = await RoleAPI.update(id, { name, otRate: ot === '' ? 0 : ot, status: old.is_default ? 'active' : status });
+                SyncIndicator.hide();
+                if (!r.success) throw new Error(r.error);
+                closeModal();
+                if (Number(old.default_monthly_salary) !== salary) { askSalaryDay(old, salary); }
+                else { Toast.success('Role updated'); loadRoles(); }
+            } catch (e) { SyncIndicator.hide(); Toast.error('Failed to save: ' + e.message); }
+        }
+
+        // ---- default salary changed: from which day, and for whom
+        function askSalaryDay(role, newSalary) {
+            pendingSalary = { role, newSalary };
+            document.getElementById('salarySummary').innerHTML = `Default salary of <strong>${esc(role.name)}</strong>: ${money(role.default_monthly_salary)} → <strong>${money(newSalary)}</strong> SAR`;
+            document.getElementById('salaryFrom').value = RoleAPI.localToday();
+            document.getElementById('salaryApply').checked = true;
+            document.getElementById('salaryApplyHint').textContent = `Active labors of this role who earn exactly ${money(role.default_monthly_salary)} now follow the new salary. Labors with a personal salary stay as they are.`;
+            document.getElementById('salaryModal').classList.add('active');
+        }
+        function closeSalaryModal() { document.getElementById('salaryModal').classList.remove('active'); pendingSalary = null; loadRoles(); }
+        async function confirmSalary() {
+            if (!pendingSalary) return;
+            const from = document.getElementById('salaryFrom').value;
+            if (!from) { Toast.error('Choose the day the new salary applies from'); return; }
+            const apply = document.getElementById('salaryApply').checked;
+            const { role, newSalary } = pendingSalary;
+            if (!confirm(`Apply ${money(newSalary)} SAR to role "${role.name}" from ${DateUtils.formatDate(from)}${apply ? ', including the labors on the default salary' : ' (the default for new labors only)'}?`)) return;
+            try {
+                SyncIndicator.show('Saving...');
+                const r = await RoleAPI.changeSalary(role.id, newSalary, from, apply);
+                SyncIndicator.hide();
+                if (!r.success) throw new Error(r.error);
+                Toast.success(apply ? `Default salary changed. ${r.data.labors_updated} labor(s) changed from ${DateUtils.formatDate(from)}.` : 'Default salary changed for new labors.');
+                pendingSalary = null;
+                document.getElementById('salaryModal').classList.remove('active');
+                loadRoles();
+            } catch (e) { SyncIndicator.hide(); Toast.error('Failed: ' + e.message); }
+        }
+
+        async function makeDefault(id) {
+            const r = roles.find(x => x.id === id);
+            if (!confirm(`Make "${r.name}" the default role?\n\nNew labors without a chosen role will get it.`)) return;
+            const res = await RoleAPI.setDefault(id);
+            if (!res.success) { Toast.error('Failed: ' + res.error); return; }
+            Toast.success('Default role changed'); loadRoles();
+        }
+
+        async function deleteRole(id) {
+            const r = roles.find(x => x.id === id);
+            const c = counts[id] ? counts[id].all : 0;
+            if (c > 0) { Toast.error(`"${r.name}" still has ${c} labor${c > 1 ? 's' : ''}. Give them another role first.`); return; }
+            if (!confirm(`Delete role "${r.name}"?`)) return;
+            const res = await RoleAPI.remove(id);
+            if (!res.success) { Toast.error('Failed: ' + res.error); return; }
+            Toast.success('Role deleted'); loadRoles();
+        }
+
+        loadRoles();
+    </script>
+    <script src="../js/ui/app-update.js?v=100"></script>
+</body>
+</html>
