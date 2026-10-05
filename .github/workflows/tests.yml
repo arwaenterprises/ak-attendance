@@ -42,6 +42,7 @@ jobs:
           node session-isolation.test.js
           node punch-month.test.js
           node shifts-ui.test.js
+          node departments-ui.test.js
           node terminal-link-ui.test.js
           node platform-ui.test.js
           node shift-reports.test.js

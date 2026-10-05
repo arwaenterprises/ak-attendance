@@ -46,9 +46,10 @@ const ReportAPI = {
 
             let laborQuery = supabaseClient
                 .from('laborers')
-                .select('labor_id, name, iqama_number, department_id, date_of_joining, status, role, shift_id')
+                .select('labor_id, name, iqama_number, department_id, date_of_joining, status, last_working_date, role, shift_id')
                 .eq('client_id', clientId)
-                .eq('status', 'active')
+                // active labors, and labors switched off on or after the first day of the report (they still count up to their last working day)
+                .or(`status.eq.active,and(status.eq.inactive,last_working_date.gte.${fromDate})`)
                 .limit(2000);
 
             if (departmentFilter) {
@@ -75,7 +76,8 @@ const ReportAPI = {
                 .eq('client_id', clientId)
                 .gte('date', bufferFromStr)
                 .lte('date', bufferToStr);
-            if (departmentFilter) attendanceQuery = attendanceQuery.eq('department_id', departmentFilter);
+            // (no department filter on the attendance rows: a labor moved to another department keeps the days recorded under the old one;
+            //  the labor list above already holds only this department's labors)
 
             // Paginate punch_records to bypass Supabase server-side 1000-row cap
             const allPunches = [];
@@ -90,7 +92,6 @@ const ReportAPI = {
                     .lte('date', toDate)
                     .order('date').order('time')
                     .range(punchFrom, punchFrom + punchPageSize - 1);
-                if (departmentFilter) punchQ = punchQ.eq('department_id', departmentFilter);
                 const { data: punchPage, error: punchPageErr } = await punchQ;
                 if (punchPageErr) throw punchPageErr;
                 allPunches.push(...(punchPage || []));
@@ -200,6 +201,10 @@ const ReportAPI = {
                     const minHours = deptMinHoursMap[labor.department_id] || '09:30';
 
                     if (labor.date_of_joining && new Date(labor.date_of_joining) > d) {
+                        continue;
+                    }
+                    // a labor switched off (for example with its department): no rows after the last working day
+                    if (labor.status === 'inactive' && labor.last_working_date && dateStr > labor.last_working_date) {
                         continue;
                     }
 
@@ -632,9 +637,7 @@ const ReportAPI = {
                 .gte('date', fetchFrom)
                 .lte('date', fetchTo);
 
-            if (departmentFilter) {
-                attendanceQuery = attendanceQuery.eq('department_id', departmentFilter);
-            }
+            // (no department filter here: labors moved between departments keep their earlier days; the labor list above is already filtered)
 
             const [{ data: attendance, error: attError }] = await Promise.all([attendanceQuery]);
             if (attError) throw attError;
@@ -652,7 +655,6 @@ const ReportAPI = {
                     .lte('date', fetchTo)
                     .order('date').order('time')
                     .range(bFrom, bFrom + bPageSize - 1);
-                if (departmentFilter) bQ = bQ.eq('department_id', departmentFilter);
                 const { data: bPage, error: bErr } = await bQ;
                 if (bErr) throw bErr;
                 billingPunches.push(...(bPage || []));
