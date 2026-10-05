@@ -97,7 +97,7 @@ const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.get
   });
 
   await test('an inactive department cannot be a move target, and its labors cannot be switched on again inside it', async () => {
-    await page.waitForFunction((c) => /inactive/.test(document.querySelector('#departmentTable tr:has-text("' + c + '")')?.innerText || ''), 'P1' + rid, { timeout: 10000 }).catch(() => {});
+    await page.waitForFunction((c) => [...document.querySelectorAll('#departmentTable tr')].some(r => r.innerText.includes(c) && /inactive/.test(r.innerText)), 'P1' + rid, { timeout: 15000 });
     await row('P2' + rid).locator('text=Move labors').click();
     await page.waitForFunction(() => document.getElementById('moveModal').classList.contains('active'), null, { timeout: 15000 }).catch(() => {});
     const opts = await page.evaluate(() => [...document.querySelectorAll('#moveToDept option')].map(o => o.value));
