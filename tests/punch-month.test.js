@@ -82,9 +82,11 @@ const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.get
     await page.waitForFunction(() => document.getElementById('attendanceModal').classList.contains('active') && document.querySelectorAll('#calGrid .cal-day').length > 0, null, { timeout: 30000 });
     ok(new RegExp(LABOR).test(await page.locator('#attendanceInfo').innerText()), 'the screen shows this labor: ' + await page.locator('#attendanceInfo').innerText());
     eq(await page.locator('#monthTitle').innerText(), now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }));
-    eq(await page.locator('#monthTotals').count(), 0); eq(await page.locator('.cal-legend').count(), 0);   // no totals tiles, no legend (the letters are on the days)
-    eq(await page.locator('#calGrid .cal-day.p').count(), 1); eq(await page.locator('#calGrid .cal-day.h').count(), 1);
-    eq(await page.locator('#calGrid .cal-day.a').count(), 1); eq(await page.locator('#calGrid .cal-day.o').count(), 1);
+    eq(await page.locator('#monthTotals').count(), 0); eq(await page.locator('.cal-legend').count(), 0);   // no totals tiles, no legend, no letters on the days
+    // green = full hours (day 1) or approved (day 7); red = short hours (day 2) or absent (day 3); grey = holiday
+    eq(await page.locator('#calGrid .cal-day.p').count(), 2); eq(await page.locator('#calGrid .cal-day.h').count(), 0);
+    eq(await page.locator('#calGrid .cal-day.a').count(), 2); eq(await page.locator('#calGrid .cal-day.o').count(), 1);
+    eq(await page.locator('#calGrid .cal-day small').count(), 0);
   });
   await test('tapping a day shows its punches as two tiles per row, and the worked hours next to the date', async () => {
     await page.click('#calGrid .cal-day[data-date="' + ymd(thisStart) + '"]');
@@ -107,22 +109,20 @@ const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.get
     await page.waitForTimeout(300);
     ok(!(await page.evaluate(() => document.getElementById('fullscreenPhoto').classList.contains('active'))), 'a tile without photo must not open anything');
   });
-  await test('a day approved by the administrator (no punches) is marked apart from worked days, and says so', async () => {
+  await test('a day approved by the administrator is green like a worked day and shows no remark', async () => {
     const d7 = ymd(new Date(thisStart.getFullYear(), thisStart.getMonth(), 7));
     const cell = page.locator('#calGrid .cal-day[data-date="' + d7 + '"]');
-    ok(/ap/.test(await cell.getAttribute('class')) && /✓/.test(await cell.innerText()), 'cell: ' + await cell.getAttribute('class') + ' / ' + await cell.innerText());
-    eq(await page.locator('#calGrid .cal-day.p').count(), 1);              // the really worked day is still the only green one
+    ok(/\bp\b/.test(await cell.getAttribute('class')), 'cell: ' + await cell.getAttribute('class'));
     await cell.click();
     await page.waitForFunction(() => /No punches/.test(document.getElementById('attendanceList').innerText), null, { timeout: 15000 });
-    ok(/Approved by the administrator/.test(await page.locator('#dayTitle').innerText()), await page.locator('#dayTitle').innerText());
-    ok(/administrator approved this day/.test(await page.locator('#attendanceList').innerText()), await page.locator('#attendanceList').innerText());
+    ok(!/pprove/.test(await page.locator('#dayTitle').innerText() + await page.locator('#attendanceList').innerText()), 'no approval remark');
   });
-  await test('an OUT punched before the IN is not counted as hours: the day says "No OUT punch" instead of "0h 0m worked"', async () => {
+  await test('an OUT punched before the IN is not counted as hours: the day does not say "0h 0m worked"', async () => {
     const d8 = ymd(new Date(thisStart.getFullYear(), thisStart.getMonth(), 8));
     await page.click('#calGrid .cal-day[data-date="' + d8 + '"]');
     await page.waitForFunction(() => document.querySelectorAll('#attendanceList .punch-item').length === 2, null, { timeout: 15000 });
     const t = await page.locator('#dayTitle').innerText();
-    ok(!/0h 0m/.test(t) && /(No OUT punch|still IN)/.test(t), t);
+    ok(!/0h 0m/.test(t) && !/No OUT punch/.test(t), t);
   });
   await test('the Close button shows the whole word "Close" (not cut off)', async () => {
     const c = await page.evaluate(() => { const e = document.querySelector('.attendance-close'), b = e.getBoundingClientRect(); return { w: b.width, scrollW: e.scrollWidth, right: b.right, vw: window.innerWidth }; });
