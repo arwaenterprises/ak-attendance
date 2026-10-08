@@ -50,9 +50,15 @@ const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.get
       { labor_id: a.L, department_id: a.dept, date: a.d1, time: '11:00:00', type: 'login', location_name: 'Gate', client_id: cid },
       { labor_id: a.L, department_id: a.dept, date: a.d1, time: '16:00:00', type: 'logout', location_name: 'Gate', client_id: cid }]);
     if (r3.error) return { e1: r3.error.message };
+    // day 7: approved by the administrator, no punches at all.  day 8: an OUT (03:03) punched BEFORE the IN (12:23), no OUT after the IN
+    const ap = await supabaseClient.from('daily_attendance').insert({ labor_id: a.L, department_id: a.dept, date: a.d7, first_login: null, last_logout: null, total_hours: 0, auto_status: 'A', final_status: 'P', approved_by: 'Admin Name', client_id: cid });
+    if (ap.error) return { e1: ap.error.message };
+    const o1 = await supabaseClient.from('punch_records').insert({ labor_id: a.L, department_id: a.dept, date: a.d8, time: '03:03:00', type: 'logout', location_name: 'Gate', client_id: cid });
+    const o2 = await supabaseClient.from('punch_records').insert({ labor_id: a.L, department_id: a.dept, date: a.d8, time: '12:23:00', type: 'login', location_name: 'Gate', client_id: cid });
+    if (o1.error || o2.error) return { e1: (o1.error || o2.error).message };
     const r2 = await supabaseClient.from('holidays').upsert({ client_id: cid, date: a.hol, name: 'Test holiday' }, { onConflict: 'client_id,date' });
     return { e1: r1.error && r1.error.message, e2: r2.error && r2.error.message };
-  }, { L: LABOR, dept: setup.dept, d1: ymd(thisStart), d2: ymd(new Date(thisStart.getTime() + 86400000 * 1)), d3: ymd(new Date(thisStart.getTime() + 86400000 * 2)), hol: ymd(new Date(thisStart.getTime() + 86400000 * 4)), prev: ymd(prevDay) });
+  }, { L: LABOR, dept: setup.dept, d1: ymd(thisStart), d2: ymd(new Date(thisStart.getTime() + 86400000 * 1)), d3: ymd(new Date(thisStart.getTime() + 86400000 * 2)), hol: ymd(new Date(thisStart.getTime() + 86400000 * 4)), d7: ymd(new Date(thisStart.getFullYear(), thisStart.getMonth(), 7)), d8: ymd(new Date(thisStart.getFullYear(), thisStart.getMonth(), 8)), prev: ymd(prevDay) });
   ok(!rows.e1 && !rows.e2, 'attendance setup failed: ' + JSON.stringify(rows));
 
   const ctx = await newCtx({ geolocation: { latitude: 1, longitude: 1 }, permissions: ['geolocation', 'camera'] });
@@ -100,6 +106,23 @@ const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.get
     await page.locator('#attendanceList .punch-item:not(.has-photo)').first().click();
     await page.waitForTimeout(300);
     ok(!(await page.evaluate(() => document.getElementById('fullscreenPhoto').classList.contains('active'))), 'a tile without photo must not open anything');
+  });
+  await test('a day approved by the administrator (no punches) is marked apart from worked days, and says so', async () => {
+    const d7 = ymd(new Date(thisStart.getFullYear(), thisStart.getMonth(), 7));
+    const cell = page.locator('#calGrid .cal-day[data-date="' + d7 + '"]');
+    ok(/ap/.test(await cell.getAttribute('class')) && /✓/.test(await cell.innerText()), 'cell: ' + await cell.getAttribute('class') + ' / ' + await cell.innerText());
+    eq(await page.locator('#calGrid .cal-day.p').count(), 1);              // the really worked day is still the only green one
+    await cell.click();
+    await page.waitForFunction(() => /No punches/.test(document.getElementById('attendanceList').innerText), null, { timeout: 15000 });
+    ok(/Approved by the administrator/.test(await page.locator('#dayTitle').innerText()), await page.locator('#dayTitle').innerText());
+    ok(/administrator approved this day/.test(await page.locator('#attendanceList').innerText()), await page.locator('#attendanceList').innerText());
+  });
+  await test('an OUT punched before the IN is not counted as hours: the day says "No OUT punch" instead of "0h 0m worked"', async () => {
+    const d8 = ymd(new Date(thisStart.getFullYear(), thisStart.getMonth(), 8));
+    await page.click('#calGrid .cal-day[data-date="' + d8 + '"]');
+    await page.waitForFunction(() => document.querySelectorAll('#attendanceList .punch-item').length === 2, null, { timeout: 15000 });
+    const t = await page.locator('#dayTitle').innerText();
+    ok(!/0h 0m/.test(t) && /(No OUT punch|still IN)/.test(t), t);
   });
   await test('the Close button shows the whole word "Close" (not cut off)', async () => {
     const c = await page.evaluate(() => { const e = document.querySelector('.attendance-close'), b = e.getBoundingClientRect(); return { w: b.width, scrollW: e.scrollWidth, right: b.right, vw: window.innerWidth }; });
