@@ -84,8 +84,11 @@ const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.get
     eq(await page.locator('#monthTitle').innerText(), now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }));
     eq(await page.locator('#monthTotals').count(), 0); eq(await page.locator('.cal-legend').count(), 0);   // no totals tiles, no legend, no letters on the days
     // green = full hours (day 1) or approved (day 7); red = short hours (day 2) or absent (day 3); grey = holiday
-    eq(await page.locator('#calGrid .cal-day.p').count(), 2); eq(await page.locator('#calGrid .cal-day.h').count(), 0);
-    eq(await page.locator('#calGrid .cal-day.a').count(), 2); eq(await page.locator('#calGrid .cal-day.o').count(), 1);
+    // (today is always grey, so a seeded day that happens to be today counts as grey)
+    const want = { 1: 'p', 2: 'a', 3: 'a', 5: 'o', 7: 'p' }; want[now.getDate()] = 'o';
+    const cnt = k => Object.values(want).filter(v => v === k).length;
+    eq(await page.locator('#calGrid .cal-day.p').count(), cnt('p')); eq(await page.locator('#calGrid .cal-day.h').count(), 0);
+    eq(await page.locator('#calGrid .cal-day.a').count(), cnt('a')); eq(await page.locator('#calGrid .cal-day.o').count(), cnt('o'));
     eq(await page.locator('#calGrid .cal-day small').count(), 0);
   });
   await test('tapping a day shows its punches as two tiles per row, and the worked hours next to the date', async () => {
@@ -112,7 +115,7 @@ const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.get
   await test('a day approved by the administrator is green like a worked day and shows no remark', async () => {
     const d7 = ymd(new Date(thisStart.getFullYear(), thisStart.getMonth(), 7));
     const cell = page.locator('#calGrid .cal-day[data-date="' + d7 + '"]');
-    ok(/\bp\b/.test(await cell.getAttribute('class')), 'cell: ' + await cell.getAttribute('class'));
+    ok(now.getDate() === 7 || /\bp\b/.test(await cell.getAttribute('class')), 'cell: ' + await cell.getAttribute('class'));
     await cell.click();
     await page.waitForFunction(() => /No punches/.test(document.getElementById('attendanceList').innerText), null, { timeout: 15000 });
     ok(!/pprove/.test(await page.locator('#dayTitle').innerText() + await page.locator('#attendanceList').innerText()), 'no approval remark');

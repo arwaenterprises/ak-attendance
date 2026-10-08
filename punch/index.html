@@ -209,6 +209,11 @@
         .status-actions.on { display: flex; }
         .status-actions button { flex: 1; height: 72px; border: 0; border-radius: 18px; font-family: inherit; font-size: 22px; font-weight: 800; cursor: pointer; }
         .status-actions .stay { background: #4ADE80; color: #052E16; } .status-actions .leave { background: #FBBF24; color: #3B2300; }
+        /* "Checking your face": the camera stays visible behind a light veil, the message sits at the bottom */
+        .status-overlay.checking { background: rgba(11,18,32,0.12); justify-content: flex-end; padding-bottom: 28px; pointer-events: none; }
+        .status-overlay.checking .status-icon, .status-overlay.checking .status-time { display: none; }
+        .status-overlay.checking .status-title, .status-overlay.checking .status-details { background: rgba(11,18,32,0.72); border-radius: 16px; padding: 8px 18px; }
+        .status-overlay.checking .status-title { font-size: 28px; } .status-overlay.checking .status-details { font-size: 17px; }
         .status-overlay.k-success { background: #06281A; color: #F0FDF4; } .k-success .status-icon { background: #4ADE80; }
         .status-overlay.k-out { background: #2B0A0F; color: #FFF1F2; } .k-out .status-icon { background: #FB7185; }
         .status-overlay.k-warn { background: #2A1B04; color: #FFFBEB; } .k-warn .status-icon { background: #FBBF24; }
@@ -633,15 +638,15 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="../js/config/supabase.js?v=103"></script>
-    <script src="../js/utils/date-utils.js?v=103"></script>
-    <script src="../js/utils/photo-utils.js?v=103"></script>
-    <script src="../js/utils/offline-storage.js?v=103"></script>
-    <script src="../js/utils/sync-manager.js?v=103"></script>
-    <script src="../js/api/labor-api.js?v=103"></script>
-    <script src="../js/api/punch-api.js?v=103"></script>
-    <script src="../js/api/terminal-api.js?v=103"></script>
-    <script src="../js/utils/photo-url.js?v=103"></script>
+    <script src="../js/config/supabase.js?v=104"></script>
+    <script src="../js/utils/date-utils.js?v=104"></script>
+    <script src="../js/utils/photo-utils.js?v=104"></script>
+    <script src="../js/utils/offline-storage.js?v=104"></script>
+    <script src="../js/utils/sync-manager.js?v=104"></script>
+    <script src="../js/api/labor-api.js?v=104"></script>
+    <script src="../js/api/punch-api.js?v=104"></script>
+    <script src="../js/api/terminal-api.js?v=104"></script>
+    <script src="../js/utils/photo-url.js?v=104"></script>
 
     <script>
         // ============ ONE SCREEN, NO SCROLL ============
@@ -1136,7 +1141,7 @@ localStorage.setItem('pwa_client_code', clientCode);
                     if (chk.success) {
                         checked = true;
                         if (!chk.allowed) {
-                            showStatus('warn', chk.message || 'Punch not allowed', '', `<span class="who">${currentLabor.name}</span>This punch was not recorded.`);
+                            showStatus('warn', plainRefusal(chk.message) || 'Punch not allowed', '', `<span class="who">${currentLabor.name}</span>`);
                             scheduleReset(7000);
                             return;
                         }
@@ -1162,7 +1167,7 @@ localStorage.setItem('pwa_client_code', clientCode);
 
                     // The labor pressed IN or OUT: refuse repeated and mismatched punches with a clear message (nothing is recorded)
                     if (kind === 'login' && punchType === 'logout') {
-                        showStatus('warn', 'You have logged in for the day', '', `<span class="who">${currentLabor.name}</span>This punch was not recorded.`);
+                        showStatus('warn', 'Already punched for the day', '', `<span class="who">${currentLabor.name}</span>`);
                         scheduleReset(7000);
                         return;
                     }
@@ -1200,7 +1205,7 @@ localStorage.setItem('pwa_client_code', clientCode);
 
                     const saveResult = await TerminalAPI.savePunchCompat(punchData);
                     if (saveResult.rejected) {
-                        showStatus('warn', saveResult.error || 'Punch not allowed', '', `<span class="who">${currentLabor.name}</span>This punch was not recorded.`);
+                        showStatus('warn', plainRefusal(saveResult.error) || 'Punch not allowed', '', `<span class="who">${currentLabor.name}</span>`);
                         scheduleReset(7000);
                         return;
                     }
@@ -1265,6 +1270,8 @@ localStorage.setItem('pwa_client_code', clientCode);
             warn: '<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#3B2300" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
             error: '<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#3F0A12" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>'
         };
+        // The database says "You have logged in for the day"; the labor sees "Already punched for the day"
+        function plainRefusal(msg) { return /logged in for the day/i.test(msg || '') ? 'Already punched for the day' : msg; }
         function showStatus(kind, title, time, details) {
             const k = STATUS_ICONS[kind] ? kind : 'error';
             document.getElementById('statusIcon').innerHTML = STATUS_ICONS[k];
@@ -1272,7 +1279,7 @@ localStorage.setItem('pwa_client_code', clientCode);
             document.getElementById('statusTime').textContent = time;
             document.getElementById('statusDetails').innerHTML = details;
             const ov = document.getElementById('statusOverlay');
-            ov.className = 'status-overlay k-' + k + ' active';
+            ov.className = 'status-overlay k-' + k + (title === 'Checking your face' ? ' checking' : '') + ' active';
         }
 
         const fmtMin = (m) => { m = Math.max(0, Math.round(Number(m) || 0)); return Math.floor(m / 60) + 'h ' + String(m % 60).padStart(2, '0') + 'm'; };
@@ -1486,13 +1493,15 @@ localStorage.setItem('pwa_client_code', clientCode);
             for (let i = 0; i < start.getDay(); i++) html += '<div></div>';
             for (let n = 1; n <= days; n++) {
                 const ds = ymd(new Date(start.getFullYear(), start.getMonth(), n)), e = byDate[ds];
-                // green = worked the department's full hours (status P) or the administrator approved the day; red = any other recorded day (short hours, LOP, punch missing)
+                // past days: green = worked the full hours (status P) or the administrator approved the day (as present / half day);
+                // red = any other recorded day (short hours, absent, LOP not approved, punch missing). Today is still running: grey.
                 let cls = '';
-                if (e && (e.status === 'P' || (e.approved && e.status === 'H'))) cls = 'p';
+                if (ds === todayStr) cls = 'o';
+                else if (e && (e.status === 'P' || (e.approved && !['A', 'LA'].includes(e.status)))) cls = 'p';
                 else if (e && e.status) cls = 'a';
                 else if (hol[ds]) cls = 'o';
                 if (ds === todayStr) cls += ' today';
-                const label = ds + ({ p: ' Present', a: ' Absent', o: ' Holiday' }[cls.trim().split(' ')[0]] || '');
+                const label = ds + ({ p: ' Present', a: ' Absent', o: ds === todayStr ? ' Today' : ' Holiday' }[cls.trim().split(' ')[0]] || '');
                 html += `<button type="button" class="cal-day ${cls}" data-date="${ds}" aria-label="${label}" onclick="selectDay('${ds}')">${n}</button>`;
             }
             grid.innerHTML = html;
@@ -1609,7 +1618,7 @@ localStorage.setItem('pwa_client_code', clientCode);
             updateLocationBar('Offline mode - Punches will sync later', true);
         });
     </script>
-    <script src="../js/ui/app-update.js?v=103"></script>
-    <script src="../js/ui/pwa-install.js?v=103"></script>
+    <script src="../js/ui/app-update.js?v=104"></script>
+    <script src="../js/ui/pwa-install.js?v=104"></script>
 </body>
 </html>

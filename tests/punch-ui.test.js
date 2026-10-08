@@ -101,14 +101,14 @@ const JPEG_B64 = require('fs').readFileSync(__dirname + '/photos.test.js', 'utf8
     eq(await page.inputValue('#laborIdInput'), '');
     ok(await page.locator('#inBtn').isEnabled(), 'buttons enabled again');
   });
-  await test('OUT right after the IN (less than 4 hours) is refused with "You have logged in for the day"; nothing new is stored', async () => {
+  await test('OUT right after the IN (less than 4 hours) is refused with "Already punched for the day"; nothing new is stored', async () => {
     await press('#outBtn', LABOR); await waitResult('k-warn');
-    const o = await ov(); ok(/logged in for the day/i.test(o.title) && !/4/.test(o.title + o.details), 'message must not mention the 4 hours: ' + JSON.stringify(o));
+    const o = await ov(); ok(/already punched for the day/i.test(o.title) && !/not recorded/i.test(o.details) && !/4/.test(o.title + o.details), 'message must not mention the 4 hours: ' + JSON.stringify(o));
     eq((await adminRows()).length, 1); await waitClosed();
   });
-  await test('IN again the same day: "You have logged in for the day", nothing new is recorded', async () => {
+  await test('IN again the same day: "Already punched for the day", nothing new is recorded', async () => {
     await press('#inBtn', LABOR); await waitResult('k-warn');
-    const o = await ov(); ok(/logged in for the day/i.test(o.title), JSON.stringify(o));
+    const o = await ov(); ok(/already punched for the day/i.test(o.title) && !/not recorded/i.test(o.details), JSON.stringify(o));
     eq((await adminRows()).length, 1); await waitClosed();
   });
   await test('OUT 5 hours after the IN asks "Leaving early?"; Stay records nothing', async () => {
