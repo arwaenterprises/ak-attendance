@@ -239,6 +239,8 @@
         .cal-day small { font-size: 10px; font-weight: 700; }
         .cal-day.p { background: #14532D; color: #BBF7D0; } .cal-day.h { background: #713F12; color: #FDE68A; }
         .cal-day.a { background: #7F1D1D; color: #FECACA; } .cal-day.o { background: #1E293B; color: #CBD5E1; }
+        .cal-day.ap { background: #134E4A; color: #99F6E4; }   /* approved by the administrator (not worked hours) */
+        .day-title .appr { color: #5EEAD4; font-size: 14px; font-weight: 800; text-transform: none; }
         .cal-day.today { box-shadow: 0 0 0 3px #38BDF8; } .cal-day.sel { outline: 2px solid #F8FAFC; outline-offset: 1px; }
         .day-detail { padding: 6px 12px 16px; }
         .day-title { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 13px; font-weight: 700; color: #94A3B8; text-transform: uppercase; margin: 4px 0 6px; }
@@ -633,15 +635,15 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="../js/config/supabase.js?v=101"></script>
-    <script src="../js/utils/date-utils.js?v=101"></script>
-    <script src="../js/utils/photo-utils.js?v=101"></script>
-    <script src="../js/utils/offline-storage.js?v=101"></script>
-    <script src="../js/utils/sync-manager.js?v=101"></script>
-    <script src="../js/api/labor-api.js?v=101"></script>
-    <script src="../js/api/punch-api.js?v=101"></script>
-    <script src="../js/api/terminal-api.js?v=101"></script>
-    <script src="../js/utils/photo-url.js?v=101"></script>
+    <script src="../js/config/supabase.js?v=102"></script>
+    <script src="../js/utils/date-utils.js?v=102"></script>
+    <script src="../js/utils/photo-utils.js?v=102"></script>
+    <script src="../js/utils/offline-storage.js?v=102"></script>
+    <script src="../js/utils/sync-manager.js?v=102"></script>
+    <script src="../js/api/labor-api.js?v=102"></script>
+    <script src="../js/api/punch-api.js?v=102"></script>
+    <script src="../js/api/terminal-api.js?v=102"></script>
+    <script src="../js/utils/photo-url.js?v=102"></script>
 
     <script>
         // ============ ONE SCREEN, NO SCROLL ============
@@ -1441,7 +1443,7 @@ localStorage.setItem('pwa_client_code', clientCode);
 
         // Show attendance modal - WITH CLIENT FILTER
         // ============ MY ATTENDANCE: month view (current + previous month) ============
-        let viewLabor = null, viewOffset = 0, viewSelected = null, monthIdleTimer = null;
+        let viewLabor = null, viewOffset = 0, viewSelected = null, monthIdleTimer = null, monthByDate = {};
         const esc = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
         const ymd = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
         function bumpIdle() {                      // a shared terminal: close the labor's page after a minute without a touch
@@ -1479,6 +1481,7 @@ localStorage.setItem('pwa_client_code', clientCode);
             if (!r.success) { grid.innerHTML = `<div class="no-punches" style="grid-column:1/-1">Could not load. ${esc(r.error)}</div>`; return; }
             const d = r.data, byDate = {}, hol = {};
             (d.days || []).forEach(x => { byDate[x.date] = x; });
+            monthByDate = byDate;
             (d.holidays || []).forEach(x => { hol[x.date] = x.name; });
             const todayStr = DateUtils.today();
             let html = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(n => `<div class="h">${n}</div>`).join('');
@@ -1490,8 +1493,10 @@ localStorage.setItem('pwa_client_code', clientCode);
                 else if (e && e.status === 'H') { cls = 'h'; letter = 'H'; }
                 else if (e && e.status === 'A') { cls = 'a'; letter = 'A'; }
                 else if (hol[ds]) { cls = 'o'; letter = 'O'; }
+                // approved by the administrator: shown apart from days that were really worked
+                if (e && e.approved && (e.status === 'P' || e.status === 'H')) { cls = 'ap'; letter = '✓'; }
                 if (ds === todayStr) cls += ' today';
-                const label = ds + (letter ? ' ' + ({ P: 'Present', H: 'Half day', A: 'Absent', O: 'Holiday' }[letter]) : '');
+                const label = ds + (letter ? ' ' + ({ P: 'Present', H: 'Half day', A: 'Absent', O: 'Holiday', '✓': 'Approved by the administrator' }[letter]) : '');
                 html += `<button type="button" class="cal-day ${cls}" data-date="${ds}" aria-label="${label}" onclick="selectDay('${ds}')">${n}${letter ? `<small>${letter}</small>` : ''}</button>`;
             }
             grid.innerHTML = html;
@@ -1516,7 +1521,13 @@ localStorage.setItem('pwa_client_code', clientCode);
             const { data: punches, error } = await TerminalAPI.todayPunches(viewLabor.labor_id, ds);
             if (viewSelected !== ds) return;       // another day was tapped meanwhile
             if (error) { listEl.innerHTML = '<div class="no-punches">Could not load this day</div>'; return; }
-            if (!punches || punches.length === 0) { listEl.innerHTML = '<div class="no-punches">No punches this day</div>'; return; }
+            const approved = !!(monthByDate[ds] && monthByDate[ds].approved);
+            const approvedTag = approved ? '<span class="appr">✓ Approved by the administrator</span>' : '';
+            if (!punches || punches.length === 0) {
+                titleEl.innerHTML = `<span>${esc(dayName)}</span>${approvedTag}`;
+                listEl.innerHTML = `<div class="no-punches">${approved ? 'No punches this day. The administrator approved this day.' : 'No punches this day'}</div>`;
+                return;
+            }
             listEl.innerHTML = punches.map(p => {
                 const isIn = p.type === 'login';
                 // tapping a tile with a photo opens the photo full screen
@@ -1528,7 +1539,11 @@ localStorage.setItem('pwa_client_code', clientCode);
             }).join('');
             PhotoURL.hydrate(listEl);
             const { totalHours, stillIn } = calculateAttendance(punches);
-            titleEl.innerHTML = `<span>${esc(dayName)}</span><span class="worked">${esc(totalHours)} worked${stillIn && ds === DateUtils.today() ? '<span class="still">still IN</span>' : ''}</span>`;
+            const isToday = ds === ymd(new Date());
+            let right;
+            if (totalHours === null) right = stillIn ? (isToday ? '<span class="worked">still IN</span>' : '<span class="worked" style="color:#FBBF24">No OUT punch</span>') : '';
+            else right = `<span class="worked">${esc(totalHours)} worked${stillIn && isToday ? '<span class="still">still IN</span>' : ''}</span>`;
+            titleEl.innerHTML = `<span>${esc(dayName)}${approved ? '<br>' + approvedTag : ''}</span>${right}`;
         }
 
         async function showAttendance(labor) {
@@ -1545,23 +1560,19 @@ localStorage.setItem('pwa_client_code', clientCode);
         }
 
         function calculateAttendance(punches) {
-            if (!punches || punches.length === 0) return { totalHours: '0h 0m', stillIn: false };
+            if (!punches || punches.length === 0) return { totalHours: null, stillIn: false };
             const toMinutes = (t) => { if (!t) return null; const parts = t.split(':').map(Number); return parts[0] * 60 + parts[1]; };
-            const start = toMinutes(punches[0].time);
+            // from the FIRST IN to the LAST OUT after it (an OUT listed before the first IN closed an earlier session: not counted here)
+            const first = punches.findIndex(p => p.type === 'login');
+            if (first < 0) return { totalHours: null, stillIn: false };
+            const start = toMinutes(punches[first].time);
             let lastOut = null;
-            punches.forEach(p => { if (p.type === 'logout') lastOut = p; });
-            let end, stillIn = false;
-            if (lastOut) {
-                end = toMinutes(lastOut.time);
-                if (end < start) end += 24 * 60;                 // an OUT after midnight that ended a night shift
-                stillIn = punches[punches.length - 1].type === 'login';   // a second session is open
-            } else {
-                const now = new Date();
-                end = now.getHours() * 60 + now.getMinutes();
-                stillIn = true;
-            }
+            punches.slice(first + 1).forEach(p => { if (p.type === 'logout') lastOut = p; });
+            if (!lastOut) return { totalHours: null, stillIn: true };                      // no OUT yet
+            let end = toMinutes(lastOut.time);
+            if (end < start) end += 24 * 60;                                              // an OUT after midnight that ended a night shift
             const total = Math.max(0, end - start);
-            return { totalHours: `${Math.floor(total / 60)}h ${total % 60}m`, stillIn };
+            return { totalHours: `${Math.floor(total / 60)}h ${total % 60}m`, stillIn: punches[punches.length - 1].type === 'login' };   // a second session may be open
         }
 
         function closeAttendanceModal() {
@@ -1604,7 +1615,7 @@ localStorage.setItem('pwa_client_code', clientCode);
             updateLocationBar('Offline mode - Punches will sync later', true);
         });
     </script>
-    <script src="../js/ui/app-update.js?v=101"></script>
-    <script src="../js/ui/pwa-install.js?v=101"></script>
+    <script src="../js/ui/app-update.js?v=102"></script>
+    <script src="../js/ui/pwa-install.js?v=102"></script>
 </body>
 </html>
