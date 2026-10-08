@@ -13,22 +13,5 @@ for f in tests/db/stubs.sql supabase/schema.sql supabase/policies-temporary-open
   if [ $code -ne 0 ]; then echo "SQL ERROR while running $f"; FAILED=1; fi
   if echo "$out" | grep -q "NOTICE:  FAIL"; then FAILED=1; fi
 done
-# --- dry run of the exact staging procedure: staging state (schema + open policies + seed) -> Auth user -> ONE bundle file
-echo "--- staging dry run (seed-staging.sql, then staging-security-bundle.sql)"
-DRY=dawam_staging_dryrun
-psql -d postgres -v ON_ERROR_STOP=1 -q -c "drop database if exists $DRY" -c "create database $DRY" || exit 1
-out=$(psql -d "$DRY" -v ON_ERROR_STOP=1 -q -f tests/db/stubs.sql -f supabase/schema.sql -f supabase/policies-temporary-open.sql -f supabase/seed-staging.sql \
-  -c "insert into auth.users (id, email) values (gen_random_uuid(), 'admin@test.dawam.arwaenterprises.com')" -f supabase/staging-security-bundle.sql \
-  -f supabase/migrations/003_lop_labor_fk.sql \
-  -c "insert into auth.users (id, email) values (gen_random_uuid(), 'terminal@test.dawam.arwaenterprises.com')" -f supabase/staging-terminal-bundle.sql 2>&1); code=$?
-echo "$out" | grep -E "ERROR|linked_login_email|admin@test" | head -5
-if [ $code -ne 0 ]; then echo "FAIL staging bundle did not run cleanly"; FAILED=1; fi
-check=$(psql -d "$DRY" -At -c "select count(*) from users where username='admin' and role='admin' and auth_id is not null and client_id='00000000-0000-0000-0000-000000000001'")
-if [ "$check" = "1" ]; then echo "PASS staging bundle links the test admin to the TEST company"; else echo "FAIL staging bundle did not link the test admin ($check)"; FAILED=1; fi
-term=$(psql -d "$DRY" -At -c "select count(*) from users where username='terminal' and role='terminal' and auth_id is not null and client_id='00000000-0000-0000-0000-000000000001'")
-if [ "$term" = "1" ]; then echo "PASS terminal bundle links the test terminal to the TEST company"; else echo "FAIL terminal bundle did not link the terminal ($term)"; FAILED=1; fi
-open=$(psql -d "$DRY" -At -c "select count(*) from pg_policies where policyname like 'tmp allow all %'")
-if [ "$open" = "0" ]; then echo "PASS staging bundle removed every temporary open policy"; else echo "FAIL $open temporary open policies remain"; FAILED=1; fi
-
 if [ $FAILED -eq 0 ]; then echo "RESULT: all database security checks passed"; else echo "RESULT: FAILED"; fi
 exit $FAILED

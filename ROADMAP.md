@@ -10,32 +10,23 @@ Rule for every task: do not break the existing workflow or architecture; test be
 
 ---
 
-## PROGRESS (updated after every finished task)
+## WHERE WE ARE (updated 2026-10-08)
 
-**Overall: about 68% complete** (my estimate: the weights are judgement, not measurement)
+Everything below is **LIVE** (app v104, database migrations 001-021 applied on the live project):
+login through Supabase Auth, one admin per company, closed database (row-level security), punch terminal with its own identity, private punch photos,
+IN / OUT rules (second IN allowed; forgotten OUT does not block the next day; night shift decided by the assigned shift), shifts with history,
+departments with Active / Inactive and moving labors, roles with salary history, platform-owner (client) management, monthly view on the terminal
+(today grey, past days green when worked in full or approved, red otherwise), update popup / PWA / offline, face refresh, photo clean-up after 15 days.
 
-| Area (what you asked for) | Weight | Done | Status |
-|---|---|---|---|
-| App update popup, PWA install, offline, new update icon, rename to Dawam | 15% | 100% | Live |
-| Security: database closed, new login, terminal, private photos, live cutover (S1-S5) | 30% | 97% | **LIVE** since 2026-10-02 (v77). Left: remove old login code after a stable period, delete the archived other-app tables when you decide |
-| One admin per client, Users page removed, many devices | 5% | 100% | Live |
-| IN / OUT punches, 4-hour lock, repeated / mismatched punch checks | 10% | 90% | **LIVE** (migration 007 on live, terminal v80+). Left: your phone test of the 4-hour lock, and your answer on what a punch after a finished OUT should do (today it starts a new IN) |
-| Shift management: Day / Night, assign labors, reports follow the shift | 20% | 0% | Not started |
-| Client (SaaS) management: platform-owner page | 10% | 0% | Not started |
-| Labor monthly attendance on the terminal | 5% | 90% | Built and tested on staging (migration 008, current + previous month); goes live with the 008 step on live |
-| Roadmap, schema files, automatic tests | 5% | 100% | Maintained every step |
+**How we work now:** no staging project and no branches. Changes go straight to `main` (the site publishes on every push); the owner tests in the browser.
+The automatic checks that remain: static checks (`node tests/static-checks.js`) and the database security tests on a throw-away Postgres (`bash tests/db/run.sh`).
 
-Rough number of remaining steps (each step = one exchange with you): S5 live cutover 3-4, IN/OUT + lock 2-3, Shift management 4-5, Platform-owner page 2-3, Monthly view 1-2.
-
-Why S5 comes before IN/OUT and the lock: those rules live in the new terminal path, which only runs after the live cutover.
-
----
-
-## NOW - next: apply 008 on live, then Day / Night shift management
-
-1. Owner: run migration 008 on the LIVE project (one paste), then test "View my attendance" on a phone.
-2. Then: Shift management (Day + Night definitions, assign labors, move between shifts, reports follow the shift, fix findings 48 and 52).
-3. Then: platform-owner (client management) page.
+### Open items (nothing is blocked)
+1. Owner: delete the browser-test files and the browser-test part of the automatic checks? They need the staging project and cannot run once it is deleted (Claude's attempt to remove them was blocked by the permission check; needs the owner's explicit OK).
+2. Owner: decide what to do with the old tables: `ot_rates` (unused since migration 018, data already copied to Roles) and the hidden schema `archive_other_apps` (other apps' data). Nothing is dropped until the owner says so.
+3. Owner: test on the live terminal the forgotten-OUT case and the night-shift case (migrations 020 / 021).
+4. Bug noticed, not fixed: `admin/settings.html` reads a table `frozen_dates` that does not exist (the real table is `attendance_freeze`); it is the "is this month frozen" check before deleting a holiday.
+5. Parked: face-scan graphic (style B, face dots), 4-hour rule decision, "change my password" button for administrators, enrollment-link leftover clean-up, retention rule for ended labors / companies, LOP codes LP / LH / LA (shown red on the month screen).
 
 ---
 
@@ -228,6 +219,7 @@ I could only read the code. I have not seen your Supabase row-level security (RL
 | 2026-10-02 | **Reports follow the shift (v88, branch only):** Labor Master has a Shift column and filter; the daily report has a Shift column (shift of that day, from the move history) and filter, an "Early -Xh Ym" mark under Logout for early leaves, and "Shift" + "Early Leave (min)" in the CSV export. Pages stay usable if shifts cannot be read. `tests/shift-reports.test.js` 4/4 on staging. Not changed (logged): the report calculates half day as 50% of the department full day while the database function uses a fixed 4 h, and the settings page values min_hours_present / min_hours_half_day are not used by either. |
 | 2026-10-02 | **Future improvements noted by the owner (not started):** (1) "Change my password" for a company administrator (My account button; Supabase `updateUser`, no email needed; the old `UserAPI.changePassword` is dead code from the pre-security login), (2) a recovery option for a forgotten administrator password (today the platform owner sets a new one under Clients > Manage), (3) optional per-device terminal keys (switch off one lost phone), (4) hint to the owner when a client trial is about to end. |
 | 2026-10-03 | **Fix: night-shift assignment not shown in Assign labors / Labor Master (v92, tested on staging: shifts-ui 9/9, shift-reports 4/4; the new case fails on the old code and passes now).** Cause (my reading, not confirmed against live data): both screens showed `laborers.shift_id`, a snapshot that `assign_shift` fills using the DATABASE date (UTC); a move dated with the admin's local date can be 'in the future' for the database, so the snapshot stayed Day while History and reports (which read the move history) were right. Same family as finding 52. Fix: `ShiftAPI.applyCurrentShift` sets each labor's shift from the move history for this device's date; used by Assign labors and Labor Master. No migration. Not done: the snapshot itself is still not refreshed for future-dated moves. |
+| 2026-10-08 | **Clean-up, no staging.** Owner: no staging project, no branches, work on `main`, test in the browser. Removed from the repo: `supabase/seed-staging.sql`, `staging-security-bundle.sql`, `staging-terminal-bundle.sql`, `tools/build-staging-bundle.js`, `supabase/maintenance/relink_punch_photos.sql` (one-off, owner ran it), the staging dry run in `tests/db/run.sh` and the staging-bundle checks in `tests/static-checks.js`. README.md and supabase/README.md rewritten. All old branches deleted by the owner. Still in the repo until the owner agrees: the browser tests (`tests/*.test.js`, `tests/lib`) and their part of `.github/workflows/tests.yml`, and the staging switch in `js/config/supabase.js`. |
 | 2026-10-08 | **Owner decisions + terminal wording (v104).** Month screen: TODAY is grey; a past day is green when it was worked in full or approved by the administrator (approved as present / half day), red otherwise (an LOP that is not approved stays red). Terminal: while "Checking your face" the camera stays visible behind a light veil; the line "This punch was not recorded" is gone; a repeated IN or an early OUT now says "Already punched for the day" (the database text is unchanged; the page rewrites it). Owner will delete the Supabase STAGING project and the working branch; from now on work goes straight to `main`. Consequence noted for the owner: the browser tests (tests/*.test.js) run against staging, so they cannot run after staging is deleted; the database suite (local Postgres) is unaffected. |
 | 2026-10-08 | **Month screen made simple (v103).** Owner: "if worked at least 9.5 hrs or admin approved show green, otherwise red if LOP or punch missing, no remark for the user". A day is green when its status is P (full department hours) or the administrator approved it; any other recorded day (short hours, absent, LOP) is red; holidays stay grey; days with no record stay plain. Letters (P/H/A/O), the teal approved tick and the remarks ("Approved by the administrator", "No OUT punch") are gone. Open point: LP/LH/LA (LOP finals) are shown red; owner to confirm. Migrations 020 and 021 were applied on staging and live on 2026-10-08. |
 | 2026-10-08 | **Supabase folder clean-up (no app change, no version bump).** Removed the one-time live cut-over files (`supabase/live/*`, `CUTOVER_PLAN.md`, `export-schema.sql`, `tools/build-live-bundle.js`) and their rehearsal tests (`tests/db/live-like.*`); live is already cut over. Added `supabase/README.md` explaining what each remaining file is. Old branches must be deleted by the owner in GitHub (not possible from the session). |

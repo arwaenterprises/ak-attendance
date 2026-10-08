@@ -1,140 +1,45 @@
 # Dawam Attendance
 
-Biometric attendance system for warehouse operations with face recognition and geo-fencing.
+Attendance system for companies with many workers: face recognition, geo-fencing, IN / OUT punches, shifts, departments, roles and salary, reports and billing.
+One installation serves many companies (each company only sees its own data).
 
-## Features
+## What it does
 
-- 👤 **Face Recognition** - Biometric attendance using face-api.js
-- 📍 **Geo-fencing** - Location-based punch validation
-- 🏛️ **Multi-Department** - Separate management per department
-- 👥 **Role-Based Access** - Super Admin, Admin, Supervisor roles
-- 📊 **Reports** - Daily, Monthly, and 3PL Billing reports
-- 📸 **Photo Capture** - Punch photos with 30-day retention
-- ✅ **LOP Management** - Leave approval workflow with bulk actions
-- 📱 **Responsive** - Works on desktop, tablet, and mobile
+- **Punch terminal** (`punch/`): the labor types the ID, presses IN or OUT, the face is checked in the oval, a photo is kept. Works offline and syncs later. "View my attendance" shows the month (green = worked in full or approved, red = otherwise, today grey).
+- **Administrator**: departments (Active / Inactive, move labors), labor master and import, face enrollment (also by a one-hour, single-use link), shifts (Day / Night with history), roles with default salary and overtime rate, salary history ("from which day"), punch locations, holidays, LOP approval, daily / monthly / overtime / 3PL billing reports.
+- **Platform owner**: creates and manages companies.
 
-## Tech Stack
+## How it is built
 
-- **Frontend**: HTML, CSS, JavaScript (Vanilla)
-- **Database**: Supabase (PostgreSQL)
-- **Storage**: Supabase Storage (punch photos)
-- **Face Recognition**: face-api.js
-- **Hosting**: GitHub Pages
+- Front end: plain HTML, CSS and JavaScript (no build step), a service worker (`sw.js`) for the install / offline / update popup. Hosted on GitHub Pages; the site publishes on every push to `main` (`.github/workflows/pages.yml`).
+- Back end: one Supabase project (Auth login, Postgres with row-level security, private storage bucket `punch-photos`). All database changes are in `supabase/migrations/` (see `supabase/README.md`).
+- Face recognition: face-api.js in the browser.
+- Photos are deleted after 15 days or when a month is closed (`.github/workflows/photo-cleanup.yml`).
 
-## Attendance Rules
+## Folders
 
-| Hours Worked | Status |
-|--------------|--------|
-| ≥ 10 hours | Present (P) |
-| 4-10 hours | Half Day (H) |
-| < 4 hours | Absent (A) |
-| Friday | Paid Holiday |
-
-## User Roles
-
-| Role | Access |
-|------|--------|
-| Super Admin | All departments, all features |
-| Admin | Own department only |
-| Supervisor | Warehouse only, can request LOP |
-
-## Project Structure
 ```
-dawam-attendance/
-├── index.html              # Login page
-├── dashboard.html          # Main dashboard
-├── admin/                  # Admin pages
-│   ├── departments.html
-│   ├── users.html
-│   └── settings.html
-├── labor/                  # Labor management
-│   ├── master.html
-│   ├── enroll.html
-│   └── import.html
-├── attendance/             # Attendance features
-│   ├── punch-locations.html
-│   └── lop.html
-├── reports/                # Reports
-│   ├── daily.html
-│   └── 3pl-billing.html
-├── punch/                  # Punch terminal
-│   └── index.html
-├── js/
-│   ├── config/
-│   │   └── supabase.js
-│   ├── auth/
-│   │   └── auth.js
-│   ├── api/
-│   │   ├── department-api.js
-│   │   ├── labor-api.js
-│   │   ├── punch-api.js
-│   │   ├── report-api.js
-│   │   ├── lop-api.js
-│   │   └── user-api.js
-│   ├── utils/
-│   │   ├── date-utils.js
-│   │   ├── csv-handler.js
-│   │   └── photo-utils.js
-│   └── ui/
-│       ├── sync-indicator.js
-│       └── toast.js
-├── css/
-│   ├── main.css
-│   ├── punch-terminal.css
-│   └── reports.css
-└── templates/
-    └── labor-import-template.csv
+index.html, dashboard.html     login and main menu
+admin/                         departments, roles, shifts, settings, companies
+labor/                         labor master, import, enrollment
+attendance/                    punch locations, LOP, overtime, holidays
+reports/                       daily, monthly, 3PL billing
+punch/                         the punch terminal
+js/                            config, auth, api (one file per area), utils, ui
+css/, icons/, templates/       styles, icons, the CSV import template
+supabase/                      schema and migrations
+tests/                         static checks and database security tests
+tools/                         bump-version.js (app version), build-site.js (what gets published)
+ROADMAP.md                     the living log: decisions, open items, change log
 ```
 
-## Setup Instructions
+## Working on it
 
-### 1. Supabase Setup
+- Work goes straight to `main`; test in the browser.
+- Change an app file => bump the version: `node tools/bump-version.js` (one number in `sw.js` and in every page).
+- Checks: `node tests/static-checks.js` and `bash tests/db/run.sh` (needs a local Postgres and `psql`).
+- A database change = a new numbered file in `supabase/migrations/` + a test in `tests/db/`, then the owner pastes it into the Supabase SQL Editor.
 
-1. Create account at [supabase.com](https://supabase.com)
-2. Create new project
-3. Run SQL scripts to create tables (see documentation)
-4. Create storage bucket `punch-photos` with public access
-5. Copy Project URL and Anon Key
+## First login
 
-### 2. Configuration
-
-Update `js/config/supabase.js` with your credentials:
-```javascript
-const SUPABASE_URL = 'your-project-url';
-const SUPABASE_ANON_KEY = 'your-anon-key';
-```
-
-### 3. Deployment
-
-1. Push code to GitHub repository
-2. Enable GitHub Pages (Settings → Pages → Source: main branch)
-3. Access at: `https://yourusername.github.io/<repository-name>/`
-
-## First Login
-
-The first admin login is created by the platform owner (see `supabase/seed-staging.sql` for the staging example). Never publish passwords in this file.
-
-## Quick Start
-
-1. Login as Super Admin
-2. Create Departments (Admin → Departments)
-3. Check the Roles (Admin → Roles): default salary and overtime rate per role
-4. Add Punch Locations (Attendance → Punch Locations)
-5. Add Laborers (Labor → Labor Master)
-6. Enroll Faces (Labor → Master → Enroll button)
-7. Give the laborers their punch link (Dashboard → Terminal Link: copy, WhatsApp or QR code)
-
-## Browser Support
-
-- Chrome (recommended)
-- Firefox
-- Safari
-- Edge
-
-## License
-
-Private
-
-## Support
-
-Contact: Akhtar Ansari
+The platform owner creates each company and its administrator. Passwords are never written in this repository.
