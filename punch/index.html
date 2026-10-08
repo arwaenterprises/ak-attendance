@@ -237,10 +237,8 @@
         .cal .h { font-size: 11px; font-weight: 700; color: #94A3B8; text-align: center; }
         .cal-day { height: 40px; border: 0; border-radius: 10px; background: #111C30; color: #94A3B8; font-family: inherit; font-size: 15px; font-weight: 800; line-height: 1.05; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
         .cal-day small { font-size: 10px; font-weight: 700; }
-        .cal-day.p { background: #14532D; color: #BBF7D0; } .cal-day.h { background: #713F12; color: #FDE68A; }
-        .cal-day.a { background: #7F1D1D; color: #FECACA; } .cal-day.o { background: #1E293B; color: #CBD5E1; }
-        .cal-day.ap { background: #134E4A; color: #99F6E4; }   /* approved by the administrator (not worked hours) */
-        .day-title .appr { color: #5EEAD4; font-size: 14px; font-weight: 800; text-transform: none; }
+        .cal-day.p { background: #14532D; color: #BBF7D0; }   /* green: worked the full hours, or approved by the administrator */
+        .cal-day.a { background: #7F1D1D; color: #FECACA; } .cal-day.o { background: #1E293B; color: #CBD5E1; }   /* red: not enough hours, LOP or punch missing */
         .cal-day.today { box-shadow: 0 0 0 3px #38BDF8; } .cal-day.sel { outline: 2px solid #F8FAFC; outline-offset: 1px; }
         .day-detail { padding: 6px 12px 16px; }
         .day-title { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 13px; font-weight: 700; color: #94A3B8; text-transform: uppercase; margin: 4px 0 6px; }
@@ -635,15 +633,15 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="../js/config/supabase.js?v=102"></script>
-    <script src="../js/utils/date-utils.js?v=102"></script>
-    <script src="../js/utils/photo-utils.js?v=102"></script>
-    <script src="../js/utils/offline-storage.js?v=102"></script>
-    <script src="../js/utils/sync-manager.js?v=102"></script>
-    <script src="../js/api/labor-api.js?v=102"></script>
-    <script src="../js/api/punch-api.js?v=102"></script>
-    <script src="../js/api/terminal-api.js?v=102"></script>
-    <script src="../js/utils/photo-url.js?v=102"></script>
+    <script src="../js/config/supabase.js?v=103"></script>
+    <script src="../js/utils/date-utils.js?v=103"></script>
+    <script src="../js/utils/photo-utils.js?v=103"></script>
+    <script src="../js/utils/offline-storage.js?v=103"></script>
+    <script src="../js/utils/sync-manager.js?v=103"></script>
+    <script src="../js/api/labor-api.js?v=103"></script>
+    <script src="../js/api/punch-api.js?v=103"></script>
+    <script src="../js/api/terminal-api.js?v=103"></script>
+    <script src="../js/utils/photo-url.js?v=103"></script>
 
     <script>
         // ============ ONE SCREEN, NO SCROLL ============
@@ -1488,16 +1486,14 @@ localStorage.setItem('pwa_client_code', clientCode);
             for (let i = 0; i < start.getDay(); i++) html += '<div></div>';
             for (let n = 1; n <= days; n++) {
                 const ds = ymd(new Date(start.getFullYear(), start.getMonth(), n)), e = byDate[ds];
-                let cls = '', letter = '';
-                if (e && e.status === 'P') { cls = 'p'; letter = 'P'; }
-                else if (e && e.status === 'H') { cls = 'h'; letter = 'H'; }
-                else if (e && e.status === 'A') { cls = 'a'; letter = 'A'; }
-                else if (hol[ds]) { cls = 'o'; letter = 'O'; }
-                // approved by the administrator: shown apart from days that were really worked
-                if (e && e.approved && (e.status === 'P' || e.status === 'H')) { cls = 'ap'; letter = '✓'; }
+                // green = worked the department's full hours (status P) or the administrator approved the day; red = any other recorded day (short hours, LOP, punch missing)
+                let cls = '';
+                if (e && (e.status === 'P' || (e.approved && e.status === 'H'))) cls = 'p';
+                else if (e && e.status) cls = 'a';
+                else if (hol[ds]) cls = 'o';
                 if (ds === todayStr) cls += ' today';
-                const label = ds + (letter ? ' ' + ({ P: 'Present', H: 'Half day', A: 'Absent', O: 'Holiday', '✓': 'Approved by the administrator' }[letter]) : '');
-                html += `<button type="button" class="cal-day ${cls}" data-date="${ds}" aria-label="${label}" onclick="selectDay('${ds}')">${n}${letter ? `<small>${letter}</small>` : ''}</button>`;
+                const label = ds + ({ p: ' Present', a: ' Absent', o: ' Holiday' }[cls.trim().split(' ')[0]] || '');
+                html += `<button type="button" class="cal-day ${cls}" data-date="${ds}" aria-label="${label}" onclick="selectDay('${ds}')">${n}</button>`;
             }
             grid.innerHTML = html;
             let pick = viewSelected;
@@ -1521,11 +1517,9 @@ localStorage.setItem('pwa_client_code', clientCode);
             const { data: punches, error } = await TerminalAPI.todayPunches(viewLabor.labor_id, ds);
             if (viewSelected !== ds) return;       // another day was tapped meanwhile
             if (error) { listEl.innerHTML = '<div class="no-punches">Could not load this day</div>'; return; }
-            const approved = !!(monthByDate[ds] && monthByDate[ds].approved);
-            const approvedTag = approved ? '<span class="appr">✓ Approved by the administrator</span>' : '';
             if (!punches || punches.length === 0) {
-                titleEl.innerHTML = `<span>${esc(dayName)}</span>${approvedTag}`;
-                listEl.innerHTML = `<div class="no-punches">${approved ? 'No punches this day. The administrator approved this day.' : 'No punches this day'}</div>`;
+                titleEl.innerHTML = `<span>${esc(dayName)}</span>`;
+                listEl.innerHTML = `<div class="no-punches">No punches this day</div>`;
                 return;
             }
             listEl.innerHTML = punches.map(p => {
@@ -1541,9 +1535,9 @@ localStorage.setItem('pwa_client_code', clientCode);
             const { totalHours, stillIn } = calculateAttendance(punches);
             const isToday = ds === ymd(new Date());
             let right;
-            if (totalHours === null) right = stillIn ? (isToday ? '<span class="worked">still IN</span>' : '<span class="worked" style="color:#FBBF24">No OUT punch</span>') : '';
+            if (totalHours === null) right = stillIn ? (isToday ? '<span class="worked">still IN</span>' : '') : '';
             else right = `<span class="worked">${esc(totalHours)} worked${stillIn && isToday ? '<span class="still">still IN</span>' : ''}</span>`;
-            titleEl.innerHTML = `<span>${esc(dayName)}${approved ? '<br>' + approvedTag : ''}</span>${right}`;
+            titleEl.innerHTML = `<span>${esc(dayName)}</span>${right}`;
         }
 
         async function showAttendance(labor) {
@@ -1615,7 +1609,7 @@ localStorage.setItem('pwa_client_code', clientCode);
             updateLocationBar('Offline mode - Punches will sync later', true);
         });
     </script>
-    <script src="../js/ui/app-update.js?v=102"></script>
-    <script src="../js/ui/pwa-install.js?v=102"></script>
+    <script src="../js/ui/app-update.js?v=103"></script>
+    <script src="../js/ui/pwa-install.js?v=103"></script>
 </body>
 </html>
