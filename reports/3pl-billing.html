@@ -73,7 +73,6 @@
             font-weight: 500;
         }
         .billing-table td.status-P { background: #c6f6d5; color: #22543d; font-weight: 600; }
-        .billing-table td.status-H { background: #fefcbf; color: #975a16; font-weight: 600; }
         .billing-table td.status-A { background: #fed7d7; color: #c53030; font-weight: 600; }
         .billing-table td.status-F { background: #e2e8f0; color: #718096; font-weight: 600; }
         .billing-table td.status-NH { background: #fef3c7; color: #92400e; font-weight: 600; }
@@ -198,10 +197,6 @@
                     <span>Present</span>
                 </div>
                 <div class="legend-item">
-                    <div class="legend-color" style="background: #fefcbf; color: #975a16;">H</div>
-                    <span>Half Day</span>
-                </div>
-                <div class="legend-item">
                     <div class="legend-color" style="background: #fed7d7; color: #c53030;">A</div>
                     <span>Absent</span>
                 </div>
@@ -225,13 +220,14 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="../js/config/supabase.js?v=104"></script>
-    <script src="../js/auth/auth.js?v=104"></script>
-    <script src="../js/utils/date-utils.js?v=104"></script>
-    <script src="../js/ui/sync-indicator.js?v=104"></script>
-    <script src="../js/ui/toast.js?v=104"></script>
-    <script src="../js/api/department-api.js?v=104"></script>
-    <script src="../js/api/report-api.js?v=104"></script>
+    <script src="../js/config/supabase.js?v=105"></script>
+    <script src="../js/auth/auth.js?v=105"></script>
+    <script src="../js/utils/date-utils.js?v=105"></script>
+    <script src="../js/ui/sync-indicator.js?v=105"></script>
+    <script src="../js/ui/toast.js?v=105"></script>
+    <script src="../js/api/department-api.js?v=105"></script>
+    <script src="../js/utils/attendance-rules.js?v=105"></script>
+    <script src="../js/api/report-api.js?v=105"></script>
 
     <script>
         if (!AUTH.requireLogin()) {
@@ -400,7 +396,6 @@
                             months: {},
                             totalMinutes: 0,
                             presentCount: 0,
-                            halfDayCount: 0,
                             absentCount: 0,
                             fridayCount: 0,
                             holidayCount: 0,
@@ -413,7 +408,6 @@
                     entry.months[monthData.month] = labor.days;
                     entry.totalMinutes += labor.totalMinutes || 0;
                     entry.presentCount += labor.presentCount;
-                    entry.halfDayCount += labor.halfDayCount;
                     entry.absentCount += labor.absentCount;
                     entry.fridayCount += labor.fridayCount;
                     entry.holidayCount += labor.holidayCount || 0;
@@ -459,7 +453,6 @@
             headerRow1 += `
                 <th rowspan="2">Total Hrs</th>
                 <th rowspan="2">P</th>
-                <th rowspan="2">H</th>
                 <th rowspan="2">A</th>
                 <th rowspan="2">F</th>
                 <th rowspan="2">NH</th>
@@ -479,7 +472,7 @@
             const mergedData = mergeData();
 
             let bodyHtml = '';
-            let grandTotalMinutes = 0, grandTotalPresent = 0, grandTotalHalfDay = 0;
+            let grandTotalMinutes = 0, grandTotalPresent = 0;
             let grandTotalAbsent = 0, grandTotalFridays = 0, grandTotalHolidays = 0;
             let grandTotalPaid = 0, grandTotalSalary = 0, grandTotalOTHours = 0, grandTotalOTAmount = 0;
 
@@ -496,7 +489,7 @@
                     const monthDays = labor.months[d.month] || {};
                     const dayData = monthDays[d.day] || { status: 'A', in: '', out: '', hours: '' };
                     const status = dayData.status;
-                    const statusClass = status === 'P' ? 'status-P' : status === 'H' ? 'status-H' :
+                    const statusClass = status === 'P' ? 'status-P' :
                                        status === 'A' ? 'status-A' : status === 'F' ? 'status-F' :
                                        status === 'NH' ? 'status-NH' : '';
                     bodyHtml += `
@@ -512,7 +505,6 @@
                 bodyHtml += `
                     <td class="hours-total">${totalHours || '-'}</td>
                     <td class="total-cell">${labor.presentCount}</td>
-                    <td class="total-cell">${labor.halfDayCount}</td>
                     <td class="total-cell">${labor.absentCount}</td>
                     <td class="total-cell">${labor.fridayCount}</td>
                     <td class="total-cell">${labor.holidayCount || 0}</td>
@@ -524,7 +516,6 @@
 
                 grandTotalMinutes += labor.totalMinutes || 0;
                 grandTotalPresent += labor.presentCount;
-                grandTotalHalfDay += labor.halfDayCount;
                 grandTotalAbsent += labor.absentCount;
                 grandTotalFridays += labor.fridayCount;
                 grandTotalHolidays += labor.holidayCount || 0;
@@ -540,7 +531,6 @@
             bodyHtml += `
                 <td>${ReportAPI.formatMinutesToHHMM(grandTotalMinutes)}</td>
                 <td>${grandTotalPresent}</td>
-                <td>${grandTotalHalfDay}</td>
                 <td>${grandTotalAbsent}</td>
                 <td>${grandTotalFridays}</td>
                 <td>${grandTotalHolidays}</td>
@@ -579,7 +569,6 @@
 
                 const colors = {
                     P: { bg: 'C6F6D5', font: '22543D' },
-                    H: { bg: 'FEFCBF', font: '975A16' },
                     A: { bg: 'FED7D7', font: 'C53030' },
                     F: { bg: 'E2E8F0', font: '718096' },
                     NH: { bg: 'FEF3C7', font: '92400E' },
@@ -596,12 +585,12 @@
                 // Header row 1
                 let headerRow1 = ['', '', '', '', '', ''];
                 allDays.forEach(d => { headerRow1.push(d.label, '', '', ''); });
-                headerRow1.push('Total Hrs', 'P', 'H', 'A', 'F', 'NH', 'Paid Days', 'Salary', 'OT Hrs', 'OT Amt');
+                headerRow1.push('Total Hrs', 'P', 'A', 'F', 'NH', 'Paid Days', 'Salary', 'OT Hrs', 'OT Amt');
 
                 // Header row 2
                 let headerRow2 = ['Sr', 'Labor ID', 'Iqama', 'Name', 'Role', 'DOJ'];
                 allDays.forEach(() => { headerRow2.push('In', 'Out', 'Hrs', 'St'); });
-                headerRow2.push('', '', '', '', '', '', '', '', '', '');
+                headerRow2.push('', '', '', '', '', '', '', '', '');
 
                 const row1 = worksheet.addRow(headerRow1);
                 const row2 = worksheet.addRow(headerRow2);
@@ -654,21 +643,20 @@
                     const stCells = Array.from({ length: totalDayCols }, (_, i) => `${colToLetter(10 + i * 4)}${currentRow}`);
                     const countFormula = val => stCells.map(c => `COUNTIF(${c},"${val}")`).join('+');
                     const pCol  = colToLetter(summaryStart + 1);
-                    const hCol  = colToLetter(summaryStart + 2);
-                    const fCol  = colToLetter(summaryStart + 4);
-                    const nhCol = colToLetter(summaryStart + 5);
-                    const pdCol = colToLetter(summaryStart + 6);
+                    const fCol  = colToLetter(summaryStart + 3);
+                    const nhCol = colToLetter(summaryStart + 4);
+                    const pdCol = colToLetter(summaryStart + 5);
 
                     rowData.push(
                         totalHours || '',
                         { formula: countFormula('P') },
-                        { formula: countFormula('H') },
                         { formula: countFormula('A') },
                         { formula: countFormula('F') },
                         { formula: countFormula('NH') },
-                        { formula: `${pCol}${currentRow}+${fCol}${currentRow}+${nhCol}${currentRow}+${hCol}${currentRow}*0.5` },
-                        // one simple formula while the salary stayed the same; otherwise the calculated amount (each day with the salary valid on that day)
-                        (labor.salaryChanged ? labor.calculatedSalary : { formula: `ROUND(${pdCol}${currentRow}/${allDays.length}*${labor.monthlySalary},0)` }),
+                        { formula: `${pCol}${currentRow}+${fCol}${currentRow}+${nhCol}${currentRow}` },
+                        // one simple formula for ONE month while the salary stayed the same; otherwise the calculated amount
+                        // (each month on its own number of days, each day with the salary valid on that day)
+                        (labor.salaryChanged || allMonthsData.length > 1 ? labor.calculatedSalary : { formula: `ROUND(${pdCol}${currentRow}/${allDays.length}*${labor.monthlySalary},0)` }),
                         ot.hours > 0 ? ot.hours : '',
                         ot.amount > 0 ? parseFloat(ot.amount.toFixed(2)) : ''
                     );
@@ -698,23 +686,23 @@
                             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.hoursTotal.bg } };
                             cell.font = { bold: true, color: { argb: colors.hoursTotal.font } };
                         }
-                        if (colNumber >= summaryStart + 1 && colNumber <= summaryStart + 5) { // P H A F NH
+                        if (colNumber >= summaryStart + 1 && colNumber <= summaryStart + 4) { // P A F NH
                             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.totalCell.bg } };
                             cell.font = { bold: true };
                         }
-                        if (colNumber === summaryStart + 6) { // Paid Days
+                        if (colNumber === summaryStart + 5) { // Paid Days
                             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.paidCell.bg } };
                             cell.font = { bold: true, color: { argb: colors.paidCell.font } };
                         }
-                        if (colNumber === summaryStart + 7) { // Salary
+                        if (colNumber === summaryStart + 6) { // Salary
                             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.salaryCell.bg } };
                             cell.font = { bold: true, color: { argb: colors.salaryCell.font } };
                         }
-                        if (colNumber === summaryStart + 8) { // OT Hours
+                        if (colNumber === summaryStart + 7) { // OT Hours
                             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.otHoursCell.bg } };
                             cell.font = { bold: true, color: { argb: colors.otHoursCell.font } };
                         }
-                        if (colNumber === summaryStart + 9) { // OT Amount
+                        if (colNumber === summaryStart + 8) { // OT Amount
                             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.otAmountCell.bg } };
                             cell.font = { bold: true, color: { argb: colors.otAmountCell.font } };
                         }
@@ -742,11 +730,10 @@
                 worksheet.getColumn(summaryStart + 2).width = 5;
                 worksheet.getColumn(summaryStart + 3).width = 5;
                 worksheet.getColumn(summaryStart + 4).width = 5;
-                worksheet.getColumn(summaryStart + 5).width = 5;
-                worksheet.getColumn(summaryStart + 6).width = 9;
-                worksheet.getColumn(summaryStart + 7).width = 10;
-                worksheet.getColumn(summaryStart + 8).width = 8;
-                worksheet.getColumn(summaryStart + 9).width = 10;
+                worksheet.getColumn(summaryStart + 5).width = 9;
+                worksheet.getColumn(summaryStart + 6).width = 10;
+                worksheet.getColumn(summaryStart + 7).width = 8;
+                worksheet.getColumn(summaryStart + 8).width = 10;
 
                 worksheet.views = [{ state: 'frozen', xSplit: 6, ySplit: 2 }];
 
@@ -799,7 +786,6 @@
                     th { background: #667eea; color: white; font-size: 6px; }
                     .sub-header { background: #5a67d8; }
                     .status-P { background: #c6f6d5; }
-                    .status-H { background: #fefcbf; }
                     .status-A { background: #fed7d7; }
                     .status-F { background: #e2e8f0; }
                     .status-NH { background: #fef3c7; }
@@ -826,6 +812,6 @@
         setupMonthCheckboxes();
         loadDepartments();
     </script>
-    <script src="../js/ui/app-update.js?v=104"></script>
+    <script src="../js/ui/app-update.js?v=105"></script>
 </body>
 </html>

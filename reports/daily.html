@@ -74,7 +74,6 @@
         thead th .col-filter::placeholder { color: rgba(255,255,255,0.6); }
         thead th select.col-filter option { color: #333; background: white; }
         .status-P  { color: #22543d; background: #c6f6d5; }
-        .status-H  { color: #975a16; background: #fefcbf; }
         .status-A  { color: #c53030; background: #fed7d7; }
         .status-F  { color: #44337a; background: #e9d8fd; }
         .status-NH { color: #44337a; background: #e9d8fd; }
@@ -251,7 +250,6 @@
             <div class="summary-strip" id="summarySection" style="display: none;">
                 <div class="scard"><span class="sval" id="totalRecords" style="color:#667eea;">0</span><span class="slbl">Total</span></div>
                 <div class="scard"><span class="sval" id="presentCount" style="color:#48bb78;">0</span><span class="slbl">Present</span></div>
-                <div class="scard"><span class="sval" id="halfDayCount" style="color:#ed8936;">0</span><span class="slbl">Half Day</span></div>
                 <div class="scard"><span class="sval" id="absentCount" style="color:#e53e3e;">0</span><span class="slbl">Absent</span></div>
                 <div class="scard"><span class="sval" id="noPunchCount" style="color:#9b2c2c;">0</span><span class="slbl">No Punch</span></div>
                 <div class="scard"><span class="sval" id="avgHours" style="color:#4299e1;">0</span><span class="slbl">Avg Hrs</span></div>
@@ -301,7 +299,6 @@
                                 <select id="cfAuto" class="col-filter" onchange="applyColumnFilters()">
                                     <option value="">All</option>
                                     <option value="P">P</option>
-                                    <option value="H">H</option>
                                     <option value="A">A</option>
                                     <option value="F">F</option>
                                     <option value="NH">NH</option>
@@ -311,7 +308,6 @@
                                 <select id="cfFinal" class="col-filter" onchange="applyColumnFilters()">
                                     <option value="">All</option>
                                     <option value="P">P</option>
-                                    <option value="H">H</option>
                                     <option value="A">A</option>
                                     <option value="F">F</option>
                                     <option value="NH">NH</option>
@@ -367,19 +363,6 @@
             </div>
             <div class="modal-body">
                 <div id="approveInfo" style="background: #f7fafc; padding: 15px; border-radius: 8px; margin-bottom: 15px;"></div>
-                <div id="finalStatusGroup" style="margin-bottom: 15px; display: none;">
-                    <label style="font-weight: 600;">Mark Absent as <span style="color: red;">*</span></label>
-                    <div style="display: flex; gap: 25px; margin-top: 10px;">
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                            <input type="radio" name="finalStatus" value="P" checked>
-                            <span class="badge status-P" style="font-size: 14px; padding: 5px 12px;">Present (P)</span>
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                            <input type="radio" name="finalStatus" value="H">
-                            <span class="badge status-H" style="font-size: 14px; padding: 5px 12px;">Half Day (H)</span>
-                        </label>
-                    </div>
-                </div>
                 <div class="form-group">
                     <label>Reason / Remarks <span style="color: red;">*</span></label>
                     <textarea id="approveReason" class="form-control" rows="3" placeholder="Enter reason for LOP approval (mandatory)"></textarea>
@@ -434,16 +417,17 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="../js/config/supabase.js?v=104"></script>
-    <script src="../js/auth/auth.js?v=104"></script>
-    <script src="../js/utils/date-utils.js?v=104"></script>
-    <script src="../js/utils/csv-handler.js?v=104"></script>
-    <script src="../js/ui/sync-indicator.js?v=104"></script>
-    <script src="../js/ui/toast.js?v=104"></script>
-    <script src="../js/api/department-api.js?v=104"></script>
-    <script src="../js/api/labor-api.js?v=104"></script>
-    <script src="../js/api/report-api.js?v=104"></script>
-    <script src="../js/utils/photo-url.js?v=104"></script>
+    <script src="../js/config/supabase.js?v=105"></script>
+    <script src="../js/auth/auth.js?v=105"></script>
+    <script src="../js/utils/date-utils.js?v=105"></script>
+    <script src="../js/utils/csv-handler.js?v=105"></script>
+    <script src="../js/ui/sync-indicator.js?v=105"></script>
+    <script src="../js/ui/toast.js?v=105"></script>
+    <script src="../js/api/department-api.js?v=105"></script>
+    <script src="../js/api/labor-api.js?v=105"></script>
+    <script src="../js/utils/attendance-rules.js?v=105"></script>
+    <script src="../js/api/report-api.js?v=105"></script>
+    <script src="../js/utils/photo-url.js?v=105"></script>
 
     <script>
         if (!AUTH.requireLogin()) {
@@ -649,7 +633,7 @@
                 if (cfPunch === 'no' && r.hasRecord) return false;
                 if (cfAuto && r.auto_status !== cfAuto) return false;
                 if (cfFinal && r.final_status !== cfFinal) return false;
-                if (cfLOP === 'pending' && !((r.auto_status === 'H' || r.auto_status === 'A') && !r.approved_by)) return false;
+                if (cfLOP === 'pending' && !(r.final_status === 'A' && !r.approved_by)) return false;
                 if (cfLOP === 'approved' && !r.approved_by) return false;
                 if (cfFreeze === 'frozen' && !isDateFrozen(r.date)) return false;
                 if (cfFreeze === 'open' && isDateFrozen(r.date)) return false;
@@ -657,7 +641,6 @@
             });
 
             const presentCount = filteredData.filter(r => r.final_status === 'P').length;
-            const halfDayCount = filteredData.filter(r => r.final_status === 'H').length;
             const absentCount  = filteredData.filter(r => r.final_status === 'A').length;
             const noPunchCount = filteredData.filter(r => !r.hasRecord && r.final_status === 'A').length;
             const recordsWithHours = filteredData.filter(r => r.total_hours && parseFloat(r.total_hours) > 0);
@@ -666,7 +649,6 @@
 
             document.getElementById('totalRecords').textContent = filteredData.length;
             document.getElementById('presentCount').textContent = presentCount;
-            document.getElementById('halfDayCount').textContent = halfDayCount;
             document.getElementById('absentCount').textContent  = absentCount;
             document.getElementById('noPunchCount').textContent = noPunchCount;
             document.getElementById('avgHours').textContent     = avgHours;
@@ -693,12 +675,13 @@
                 const finalStatusText = record.final_status || 'A';
 
                 const dateFrozen = isDateFrozen(record.date);
-                const canApprove = (record.auto_status === 'H' || record.auto_status === 'A') &&
+                // only an Absent day can be approved (a working day short of the hours or without punch, or a Friday / holiday
+                // made Absent by the sandwich rule); an approval always makes the day Present
+                const canApprove = record.final_status === 'A' &&
                                    !record.approved_by &&
-                                   isDateApprovable(record.date) &&
-                                   !record.isFriday;
+                                   isDateApprovable(record.date);
 
-                const wasApproved = record.approved_by && (record.final_status === 'P' || record.final_status === 'H');
+                const wasApproved = record.approved_by && record.final_status === 'P';
 
                 let checkboxHtml = '';
                 if (isAdmin && canApprove) {
@@ -709,8 +692,8 @@
                 }
 
                 let lopActionHtml = '';
-                if (record.isFriday) {
-                    lopActionHtml = '<span class="frozen-badge">Friday</span>';
+                if (record.final_status === 'F' || record.final_status === 'NH') {
+                    lopActionHtml = `<span class="frozen-badge">${record.final_status === 'F' ? 'Friday' : 'Holiday'} (paid)</span>`;
                 } else if (dateFrozen && !isAdmin) {
                     lopActionHtml = '<span class="frozen-badge">🔒 Frozen</span>';
                 } else if (wasApproved) {
@@ -719,12 +702,12 @@
                             <span class="badge status-${record.final_status}">${record.auto_status} → ${record.final_status}</span>
                             <button class="reason-btn" onclick="viewReason('${recordKey}')" title="View reason">💬</button>
                             <span style="font-size: 11px; color: #38a169; white-space: nowrap;">by ${record.approved_by}</span>
-                            ${isAdmin && record.id ? `<button class="undo-btn" onclick="undoApproval('${record.id}')">↩ Undo</button>` : ''}
+                            ${isAdmin && record.id ? `<button class="undo-btn" onclick="undoApproval('${recordKey}')">↩ Undo</button>` : ''}
                         </div>
                     `;
                 } else if (canApprove) {
                     lopActionHtml = `<button class="approve-btn" onclick="openApproveModal('${recordKey}')">✓ Approve</button>`;
-                } else if (!isDateApprovable(record.date) && (record.auto_status === 'H' || record.auto_status === 'A')) {
+                } else if (!isDateApprovable(record.date) && record.final_status === 'A') {
                     lopActionHtml = `<span class="frozen-badge">🔒 Closed</span>`;
                 } else {
                     lopActionHtml = '-';
@@ -883,16 +866,13 @@
                 ? '<div style="color: #c53030; font-size: 12px; margin-top: 5px;">⚠️ This labor did not punch. A new attendance record will be created.</div>'
                 : '';
 
-            const isAbsent = record.auto_status === 'A';
             document.getElementById('approveModalTitle').textContent = 'Approve LOP';
             document.getElementById('approveInfo').innerHTML = `
                 <div><strong>Labor:</strong> ${record.laborName || record.labor_id} (${record.labor_id})</div>
                 <div><strong>Date:</strong> ${DateUtils.formatDate(record.date)}</div>
-                <div><strong>Status:</strong> ${record.auto_status} → ${isAbsent ? 'P or H (your choice below)' : 'P'}</div>
+                <div><strong>Status:</strong> A → P (Present)</div>
                 ${noPunchNote}
             `;
-            document.getElementById('finalStatusGroup').style.display = isAbsent ? 'block' : 'none';
-            document.querySelector('input[name="finalStatus"][value="P"]').checked = true;
             document.getElementById('approveReason').value = '';
             document.getElementById('approveModal').classList.add('active');
         }
@@ -916,18 +896,12 @@
                 ? `<div style="color: #c53030; font-size: 12px; margin-top: 5px;">⚠️ ${noPunchCount} record(s) have no punch - new attendance records will be created.</div>`
                 : '';
 
-            const hasAbsentInBulk = [...selectedItems].some(key => {
-                const r = getRecordByKey(key);
-                return r && r.auto_status === 'A';
-            });
             document.getElementById('approveModalTitle').textContent = 'Bulk Approve LOP';
             document.getElementById('approveInfo').innerHTML = `
                 <div><strong>Selected Records:</strong> ${selectedItems.size}</div>
-                <div style="color: #718096; font-size: 13px; margin-top: 5px;">Half Day records → Present. Absent records → your choice below.</div>
+                <div style="color: #718096; font-size: 13px; margin-top: 5px;">Every selected day becomes Present (P).</div>
                 ${noPunchNote}
             `;
-            document.getElementById('finalStatusGroup').style.display = hasAbsentInBulk ? 'block' : 'none';
-            document.querySelector('input[name="finalStatus"][value="P"]').checked = true;
             document.getElementById('approveReason').value = '';
             document.getElementById('approveModal').classList.add('active');
         }
@@ -945,7 +919,7 @@
                 return;
             }
 
-            const chosenStatus = document.querySelector('input[name="finalStatus"]:checked')?.value || 'P';
+            const finalStatus = 'P';      // no half day: an approval always makes the day Present
 
             try {
                 SyncIndicator.show('Approving...');
@@ -958,7 +932,6 @@
                         const record = getRecordByKey(key);
                         if (!record) continue;
 
-                        const finalStatus = record.auto_status === 'A' ? chosenStatus : 'P';
                         let result;
                         if (record.id) {
                             result = await ReportAPI.approveLOP(record.id, reason, null, null, null, finalStatus);
@@ -981,7 +954,6 @@
                     clearSelection();
                 } else {
                     const record = pendingApproveRecord;
-                    const finalStatus = record.auto_status === 'A' ? chosenStatus : 'P';
                     let result;
 
                     if (record.id) {
@@ -1003,12 +975,15 @@
             }
         }
 
-        async function undoApproval(recordId) {
+        async function undoApproval(recordKey) {
+            const record = getRecordByKey(recordKey);
+            if (!record || !record.id) return;
             if (!confirm('Are you sure you want to undo this approval?')) return;
 
             try {
                 SyncIndicator.show('Undoing...');
-                const result = await ReportAPI.undoLOP(recordId, 'A');
+                // back to what the hours say (the database's own status of that day)
+                const result = await ReportAPI.undoLOP(record.id, record.auto_status === 'P' ? 'P' : 'A');
                 if (!result.success) throw new Error(result.error);
                 Toast.success('Approval undone');
                 await generateReport();
@@ -1151,6 +1126,6 @@
         setDefaultDates();
         loadFilters();
     </script>
-    <script src="../js/ui/app-update.js?v=104"></script>
+    <script src="../js/ui/app-update.js?v=105"></script>
 </body>
 </html>

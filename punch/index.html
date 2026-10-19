@@ -638,15 +638,16 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="../js/config/supabase.js?v=104"></script>
-    <script src="../js/utils/date-utils.js?v=104"></script>
-    <script src="../js/utils/photo-utils.js?v=104"></script>
-    <script src="../js/utils/offline-storage.js?v=104"></script>
-    <script src="../js/utils/sync-manager.js?v=104"></script>
-    <script src="../js/api/labor-api.js?v=104"></script>
-    <script src="../js/api/punch-api.js?v=104"></script>
-    <script src="../js/api/terminal-api.js?v=104"></script>
-    <script src="../js/utils/photo-url.js?v=104"></script>
+    <script src="../js/config/supabase.js?v=105"></script>
+    <script src="../js/utils/date-utils.js?v=105"></script>
+    <script src="../js/utils/photo-utils.js?v=105"></script>
+    <script src="../js/utils/offline-storage.js?v=105"></script>
+    <script src="../js/utils/sync-manager.js?v=105"></script>
+    <script src="../js/api/labor-api.js?v=105"></script>
+    <script src="../js/api/punch-api.js?v=105"></script>
+    <script src="../js/utils/attendance-rules.js?v=105"></script>
+    <script src="../js/api/terminal-api.js?v=105"></script>
+    <script src="../js/utils/photo-url.js?v=105"></script>
 
     <script>
         // ============ ONE SCREEN, NO SCROLL ============
@@ -1489,25 +1490,35 @@ localStorage.setItem('pwa_client_code', clientCode);
             monthByDate = byDate;
             (d.holidays || []).forEach(x => { hol[x.date] = x.name; });
             const todayStr = DateUtils.today();
+            // same day rules as the reports and the 3PL (js/utils/attendance-rules.js): the database gives P / A for working days;
+            // Fridays and holidays are paid, punched or not, unless the sandwich rule (Settings) makes them Absent
+            const doj = d.date_of_joining || null;
+            const switches = { friday: d.sandwich_friday !== false, nh: d.sandwich_nh !== false };
+            const recordOf = ds => byDate[ds] ? { final_status: byDate[ds].status, approved_by: byDate[ds].approved ? 'admin' : null } : null;
+            const statusOf = ds => (ds >= todayStr || (doj && ds < doj)) ? null : AttendanceRules.workingStatus(recordOf(ds));
             let html = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(n => `<div class="h">${n}</div>`).join('');
             for (let i = 0; i < start.getDay(); i++) html += '<div></div>';
             for (let n = 1; n <= days; n++) {
                 const ds = ymd(new Date(start.getFullYear(), start.getMonth(), n)), e = byDate[ds];
-                // past days: green = worked the full hours (status P) or the administrator approved the day (as present / half day);
-                // red = any other recorded day (short hours, absent, LOP not approved, punch missing). Today is still running: grey.
-                let cls = '';
-                if (ds === todayStr) cls = 'o';
-                else if (e && (e.status === 'P' || (e.approved && !['A', 'LA'].includes(e.status)))) cls = 'p';
-                else if (e && e.status) cls = 'a';
-                else if (hol[ds]) cls = 'o';
-                if (ds === todayStr) cls += ' today';
-                const label = ds + ({ p: ' Present', a: ' Absent', o: ds === todayStr ? ' Today' : ' Holiday' }[cls.trim().split(' ')[0]] || '');
-                html += `<button type="button" class="cal-day ${cls}" data-date="${ds}" aria-label="${label}" onclick="selectDay('${ds}')">${n}</button>`;
+                const off = AttendanceRules.offDay(ds, hol);
+                // past days: green = Present (full hours, or approved by the administrator) or a paid Friday / holiday;
+                // red = Absent (short hours, a missing punch, or a Friday / holiday lost by the sandwich rule). Today is still running: grey.
+                let cls = '', label = '';
+                if (ds === todayStr) { cls = 'o today'; label = ' Today'; }
+                else if (ds > todayStr || (doj && ds < doj)) { if (hol[ds]) { cls = 'o'; label = ' Holiday'; } }
+                else if (off) {
+                    const lost = AttendanceRules.sandwiched(ds, hol, switches, statusOf) && !(e && e.approved);      // the administrator can still approve it
+                    cls = lost ? 'a' : 'p';
+                    label = (off === 'NH' ? ' Holiday' : ' Friday') + (lost ? ' not paid' : ' paid');
+                }
+                else if (e) { cls = AttendanceRules.workingStatus(recordOf(ds)) === 'P' ? 'p' : 'a'; label = cls === 'p' ? ' Present' : ' Absent'; }
+                html += `<button type="button" class="cal-day ${cls}" data-date="${ds}" aria-label="${ds}${label}" onclick="selectDay('${ds}')">${n}</button>`;
             }
             grid.innerHTML = html;
             let pick = viewSelected;
             if (!pick) {                           // previous month: the last day that has attendance
-                const last = (d.days || []).length ? d.days[d.days.length - 1].date : null;
+                const inMonth = (d.days || []).filter(x => x.date.slice(0, 7) === ymd(start).slice(0, 7));     // the list also holds the days around the month
+                const last = inMonth.length ? inMonth[inMonth.length - 1].date : null;
                 pick = viewOffset === 0 ? todayStr : last;
             }
             if (pick) await selectDay(pick); else { document.getElementById('dayTitle').textContent = ''; document.getElementById('attendanceList').innerHTML = '<div class="no-punches">No attendance this month</div>'; }
@@ -1618,7 +1629,7 @@ localStorage.setItem('pwa_client_code', clientCode);
             updateLocationBar('Offline mode - Punches will sync later', true);
         });
     </script>
-    <script src="../js/ui/app-update.js?v=104"></script>
-    <script src="../js/ui/pwa-install.js?v=104"></script>
+    <script src="../js/ui/app-update.js?v=105"></script>
+    <script src="../js/ui/pwa-install.js?v=105"></script>
 </body>
 </html>

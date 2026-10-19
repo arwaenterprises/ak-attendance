@@ -1,4 +1,4 @@
-// Dawam Attendance - Report API v7 (sandwich rule block fix + cross-month + per-client toggles)
+// Dawam Attendance - Report API (day rules: database P / A + AttendanceRules for Friday, holidays and the sandwich rule)
 const ReportAPI = {
     // Get daily attendance summary (original - only punched laborers)
     async getDailyAttendance(fromDate, toDate, departmentId = null) {
@@ -38,7 +38,30 @@ const ReportAPI = {
         }
     },
 
+    // Read every row of a query page by page (the server returns at most 1000 rows per request)
+    async _fetchAll(build) {
+        const rows = [];
+        for (let from = 0; ; from += 1000) {
+            const { data, error } = await build().range(from, from + 999);
+            if (error) throw error;
+            rows.push(...(data || []));
+            if (!data || data.length < 1000) break;
+        }
+        return rows;
+    },
+
+    // The two sandwich-rule switches of this company (Settings page)
+    async _sandwichSwitches(clientId) {
+        const { data } = await supabaseClient.from('settings').select('key, value').eq('client_id', clientId)
+            .in('key', ['sandwich_rule_friday', 'sandwich_rule_nh']);
+        const map = {};
+        (data || []).forEach(s => { map[s.key] = s.value; });
+        return AttendanceRules.sandwichSwitches(map);
+    },
+
     // Get COMPLETE attendance - ALL active laborers (punched + non-punched)
+    // Status and hours come from daily_attendance (the database applies the one rule: full required hours = P, else A);
+    // Friday / holidays and the sandwich rule come from AttendanceRules (same as the 3PL and the terminal's month screen).
     async getCompleteAttendance(fromDate, toDate, departmentId = null) {
         try {
             const departmentFilter = departmentId || AUTH.getDepartmentFilter();
@@ -60,48 +83,32 @@ const ReportAPI = {
             if (laborError) throw laborError;
             if (laborers?.length === 2000) console.warn('Complete attendance laborers hit 2000 record limit');
 
-            // Fetch ±1 day buffer for sandwich rule boundary lookups
-            const bufferFrom = new Date(fromDate);
-            bufferFrom.setDate(bufferFrom.getDate() - 1);
-            const bufferTo = new Date(toDate);
-            bufferTo.setDate(bufferTo.getDate() + 1);
-            const pad = n => String(n).padStart(2, '0');
-            const bufferFromStr = `${bufferFrom.getFullYear()}-${pad(bufferFrom.getMonth()+1)}-${pad(bufferFrom.getDate())}`;
-            const bufferToStr = `${bufferTo.getFullYear()}-${pad(bufferTo.getMonth()+1)}-${pad(bufferTo.getDate())}`;
+            // 14 days around the report: the working days before / after a Friday or a holiday run (sandwich rule)
+            const bufferFromStr = AttendanceRules.addDays(fromDate, -14);
+            const bufferToStr = AttendanceRules.addDays(toDate, 14);
 
-            // Run all remaining queries in parallel to minimise latency
-            let attendanceQuery = supabaseClient
+            // (no department filter on the attendance rows: a labor moved to another department keeps the days recorded under the old one;
+            //  the labor list above already holds only this department's labors)
+            const attendancePromise = this._fetchAll(() => supabaseClient
                 .from('daily_attendance')
                 .select('*')
                 .eq('client_id', clientId)
                 .gte('date', bufferFromStr)
-                .lte('date', bufferToStr);
-            // (no department filter on the attendance rows: a labor moved to another department keeps the days recorded under the old one;
-            //  the labor list above already holds only this department's labors)
+                .lte('date', bufferToStr)
+                .order('date').order('labor_id'));
 
-            // Paginate punch_records to bypass Supabase server-side 1000-row cap
-            const allPunches = [];
-            const punchPageSize = 1000;
-            let punchFrom = 0;
-            while (true) {
-                let punchQ = supabaseClient
-                    .from('punch_records')
-                    .select('labor_id, date, time, type, location_name, is_night_shift_end, early_out, early_minutes')
-                    .eq('client_id', clientId)
-                    .gte('date', fromDate)
-                    .lte('date', toDate)
-                    .order('date').order('time')
-                    .range(punchFrom, punchFrom + punchPageSize - 1);
-                const { data: punchPage, error: punchPageErr } = await punchQ;
-                if (punchPageErr) throw punchPageErr;
-                allPunches.push(...(punchPage || []));
-                if (!punchPage || punchPage.length < punchPageSize) break;
-                punchFrom += punchPageSize;
-            }
+            // punches: only for the location and the early-leave mark
+            const punchesPromise = this._fetchAll(() => supabaseClient
+                .from('punch_records')
+                .select('labor_id, date, time, location_name, early_out, early_minutes')
+                .eq('client_id', clientId)
+                .gte('date', fromDate)
+                .lte('date', toDate)
+                .order('date').order('time').order('id'));
 
             const deptQuery = supabaseClient
                 .from('departments')
-                .select('id, name, min_hours_full_day')
+                .select('id, name')
                 .eq('client_id', clientId);
 
             const holidayQuery = supabaseClient
@@ -117,14 +124,14 @@ const ReportAPI = {
             const assignQuery = supabaseClient.from('shift_assignments').select('labor_id, shift_id, from_date').eq('client_id', clientId).limit(5000);
 
             const [
-                { data: attendance, error: attError },
+                attendance,
+                allPunches,
                 { data: departments },
                 { data: holidaysData },
                 shiftRes,
-                assignRes
-            ] = await Promise.all([attendanceQuery, deptQuery, holidayQuery, shiftQuery, assignQuery]);
-
-            if (attError) throw attError;
+                assignRes,
+                switches
+            ] = await Promise.all([attendancePromise, punchesPromise, deptQuery, holidayQuery, shiftQuery, assignQuery, this._sandwichSwitches(clientId)]);
 
             // shift of a labor on a date: the latest move up to that date, else his current shift, else the Day shift (same rule as the database)
             const shiftMap = {};
@@ -142,147 +149,84 @@ const ReportAPI = {
 
             const earlyMap = {};
             const punchLocationMap = {};
-            const punchTimeMap = {};
             allPunches.forEach(p => {
                 const key = `${p.labor_id}_${p.date}`;
                 if (p.early_out) earlyMap[key] = Math.max(earlyMap[key] || 0, p.early_minutes || 0);
                 if (!punchLocationMap[key]) punchLocationMap[key] = p.location_name || '';
-                if (!punchTimeMap[key]) punchTimeMap[key] = { firstIn: null, lastOut: null, nightEnd: null };
-                if (p.is_night_shift_end) {
-                    // an OUT that ended a night shift; an IN after it (a second session) is not part of the first-IN / last-OUT times
-                    if (p.type !== 'login' && (!punchTimeMap[key].nightEnd || p.time > punchTimeMap[key].nightEnd))
-                        punchTimeMap[key].nightEnd = p.time;
-                } else {
-                    // hours = first IN to the LAST OUT of the day; an open second IN does not move the last OUT
-                    if (!punchTimeMap[key].firstIn || p.time < punchTimeMap[key].firstIn)
-                        punchTimeMap[key].firstIn = p.time;
-                    if (p.type !== 'login' && (!punchTimeMap[key].lastOut || p.time > punchTimeMap[key].lastOut))
-                        punchTimeMap[key].lastOut = p.time;
-                }
             });
-            for (const entry of Object.values(punchTimeMap)) {
-                if (entry.nightEnd) {
-                    entry.lastOut = entry.nightEnd;
-                    if (!entry.firstIn) entry.firstIn = entry.nightEnd;
-                }
-                if (!entry.firstIn) entry.firstIn = entry.lastOut;
-                if (!entry.lastOut) entry.lastOut = entry.firstIn;   // only an IN so far: shown as before (same time, 0 hours)
-            }
 
             const deptMap = {};
-            const deptMinHoursMap = {};
-            (departments || []).forEach(d => {
-                deptMap[d.id] = d.name;
-                deptMinHoursMap[d.id] = d.min_hours_full_day || '09:30';
-            });
+            (departments || []).forEach(d => { deptMap[d.id] = d.name; });
 
             const holidayMap = {};
             (holidaysData || []).forEach(h => { holidayMap[h.date] = h.name; });
 
             const attendanceMap = {};
-            (attendance || []).forEach(a => {
-                const key = `${a.labor_id}_${a.date}`;
-                attendanceMap[key] = a;
-            });
+            attendance.forEach(a => { attendanceMap[`${a.labor_id}_${a.date}`] = a; });
+
+            const today = AttendanceRules.today();
+            const statusFor = labor => dateStr => {
+                if (dateStr >= today) return null;                                         // not finished yet
+                if (labor.date_of_joining && dateStr < labor.date_of_joining) return null;
+                if (labor.status === 'inactive' && labor.last_working_date && dateStr > labor.last_working_date) return null;
+                return AttendanceRules.workingStatus(attendanceMap[`${labor.labor_id}_${dateStr}`]);
+            };
 
             const result = [];
-            const startDate = new Date(fromDate);
-            const endDate = new Date(toDate);
-
-            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-                const dateStr = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-                const dayOfWeek = d.getDay();
-                const isFriday = dayOfWeek === 5;
-                const isNH = !!holidayMap[dateStr];
+            for (let dateStr = fromDate; dateStr <= toDate; dateStr = AttendanceRules.addDays(dateStr, 1)) {
+                const isFriday = AttendanceRules.isFriday(dateStr);
+                const offDay = AttendanceRules.offDay(dateStr, holidayMap);
 
                 for (const labor of laborers) {
                     const key = `${labor.labor_id}_${dateStr}`;
-                    const record = attendanceMap[key];
-                    const minHours = deptMinHoursMap[labor.department_id] || '09:30';
+                    const record = attendanceMap[key] || null;
 
-                    if (labor.date_of_joining && new Date(labor.date_of_joining) > d) {
-                        continue;
-                    }
+                    if (labor.date_of_joining && dateStr < labor.date_of_joining) continue;
                     // a labor switched off (for example with its department): no rows after the last working day
-                    if (labor.status === 'inactive' && labor.last_working_date && dateStr > labor.last_working_date) {
-                        continue;
+                    if (labor.status === 'inactive' && labor.last_working_date && dateStr > labor.last_working_date) continue;
+
+                    const approved = !!(record && record.approved_by && String(record.approved_by).trim());
+                    let autoStatus, finalStatus;
+                    if (offDay) {
+                        // Friday / holiday: paid whether punched or not; Absent only by the sandwich rule (the administrator can still approve it)
+                        autoStatus = offDay;
+                        const sandwiched = AttendanceRules.sandwiched(dateStr, holidayMap, switches, statusFor(labor));
+                        finalStatus = sandwiched ? (approved ? AttendanceRules.workingStatus(record) : 'A') : offDay;
+                    } else {
+                        autoStatus = record && record.auto_status === 'P' ? 'P' : 'A';
+                        finalStatus = AttendanceRules.workingStatus(record);
                     }
 
-                    const punchTimes = punchTimeMap[key];
-                    if (record || punchTimes) {
-                        const firstLogin = punchTimes ? punchTimes.firstIn : (record?.first_login || null);
-                        const lastLogout = punchTimes ? punchTimes.lastOut : (record?.last_logout || null);
-                        const totalHours = (firstLogin && lastLogout)
-                            ? this.calculateHours(firstLogin, lastLogout) / 60
-                            : (record?.total_hours || null);
-                        const autoStatus = (firstLogin && lastLogout)
-                            ? this.determineStatus(this.calculateHours(firstLogin, lastLogout), minHours)
-                            : (isNH ? 'NH' : (isFriday ? 'F' : 'A'));
-                        // Keep final_status when manually overridden: legacy LP/LH/LA codes OR admin LOP approval
-                        const manualOverride = record && (
-                            ['LP','LH','LA'].includes(record.final_status) ||
-                            record.approved_by
-                        );
-                        const effectiveStatus = manualOverride ? record.final_status : autoStatus;
-                        result.push({
-                            ...(record || {}),
-                            labor_id: labor.labor_id,
-                            department_id: labor.department_id,
-                            date: dateStr,
-                            first_login: firstLogin,
-                            last_logout: lastLogout,
-                            total_hours: totalHours,
-                            auto_status: autoStatus,
-                            final_status: effectiveStatus,
-                            laborName: labor.name,
-                            role: labor.role || 'Labor',
-                            iqamaNumber: labor.iqama_number,
-                            departmentName: deptMap[labor.department_id] || '-',
-                            punchLocation: punchLocationMap[key] || '',
-                            shiftName: (shiftOf(labor, dateStr) || {}).name || '',
-                            isNightShift: !!(shiftOf(labor, dateStr) || {}).is_night,
-                            earlyOut: key in earlyMap,
-                            earlyMinutes: earlyMap[key] || 0,
-                            hasRecord: true,
-                            isFriday
-                        });
-                    } else {
-                        const autoStatus = isNH ? 'NH' : (isFriday ? 'F' : 'A');
-                        const effectiveStatus = autoStatus;
-                        result.push({
-                            id: null,
-                            labor_id: labor.labor_id,
-                            department_id: labor.department_id,
-                            date: dateStr,
-                            first_login: null,
-                            last_logout: null,
-                            total_hours: null,
-                            auto_status: autoStatus,
-                            final_status: effectiveStatus,
-                            approved_by: null,
-                            approved_at: null,
-                            lop_reason: null,
-                            client_id: clientId,
-                            laborName: labor.name,
-                            role: labor.role || 'Labor',
-                            iqamaNumber: labor.iqama_number,
-                            departmentName: deptMap[labor.department_id] || '-',
-                            punchLocation: '',
-                            shiftName: (shiftOf(labor, dateStr) || {}).name || '',
-                            isNightShift: !!(shiftOf(labor, dateStr) || {}).is_night,
-                            earlyOut: false,
-                            earlyMinutes: 0,
-                            hasRecord: false,
-                            isFriday
-                        });
-                    }
+                    const shift = shiftOf(labor, dateStr) || {};
+                    result.push({
+                        id: null, approved_by: null, approved_at: null, lop_reason: null, client_id: clientId,
+                        ...(record || {}),
+                        labor_id: labor.labor_id,
+                        department_id: labor.department_id,
+                        date: dateStr,
+                        first_login: record ? record.first_login : null,
+                        last_logout: record ? record.last_logout : null,
+                        total_hours: record && Number(record.total_hours) > 0 ? Number(record.total_hours) : null,
+                        auto_status: autoStatus,
+                        final_status: finalStatus,
+                        laborName: labor.name,
+                        role: labor.role || 'Labor',
+                        iqamaNumber: labor.iqama_number,
+                        departmentName: deptMap[labor.department_id] || '-',
+                        punchLocation: punchLocationMap[key] || '',
+                        shiftName: shift.name || '',
+                        isNightShift: !!shift.is_night,
+                        earlyOut: key in earlyMap,
+                        earlyMinutes: earlyMap[key] || 0,
+                        hasRecord: !!record,
+                        isFriday,
+                        isOffDay: !!offDay
+                    });
                 }
             }
 
             result.sort((a, b) => {
-                if (a.date !== b.date) {
-                    return new Date(b.date) - new Date(a.date);
-                }
+                if (a.date !== b.date) return a.date < b.date ? 1 : -1;
                 const aNum = parseInt(a.labor_id.replace(/\D/g, '')) || 0;
                 const bNum = parseInt(b.labor_id.replace(/\D/g, '')) || 0;
                 return aNum - bNum;
@@ -568,41 +512,22 @@ const ReportAPI = {
         }
     },
 
-    // Determine status based on worked hours and min hours
-    determineStatus(workedMinutes, minHoursFullDay) {
-        if (!workedMinutes || workedMinutes <= 0) return 'A';
-        const fullDayMinutes = this.parseTimeToMinutes(minHoursFullDay || '09:30');
-        const halfDayMinutes = fullDayMinutes / 2;
-        if (workedMinutes >= fullDayMinutes) return 'P';
-        else if (workedMinutes >= halfDayMinutes) return 'H';
-        else return 'A';
-    },
-
     // Get monthly summary for 3PL billing
+    // Same day rules as the daily report: working day P / A from daily_attendance (the database's one rule), Friday and holidays
+    // always paid unless the sandwich rule applies (AttendanceRules). Paid days = P + F + NH.
     async getMonthlyBilling(year, month, departmentId = null, statusFilter = 'active') {
         try {
             const departmentFilter = departmentId || AUTH.getDepartmentFilter();
-            
-            const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+            const clientId = AUTH.getClientId();
+
             const lastDay = new Date(year, month, 0).getDate();
-            const endDate = `${year}-${String(month).padStart(2, '0')}-${lastDay}`;
-
-            const { data: deptData, error: deptError } = await supabaseClient
-                .from('departments')
-                .select('id, min_hours_full_day')
-                .eq('client_id', AUTH.getClientId());
-            
-            if (deptError) throw deptError;
-
-            const deptMinHoursMap = {};
-            (deptData || []).forEach(d => {
-                deptMinHoursMap[d.id] = d.min_hours_full_day || '09:30';
-            });
+            const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+            const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
             let laborQuery = supabaseClient
                 .from('laborers')
                 .select('labor_id, iqama_number, name, date_of_joining, department_id, status, last_working_date, role, monthly_salary')
-                .eq('client_id', AUTH.getClientId());
+                .eq('client_id', clientId);
 
             if (departmentFilter) {
                 laborQuery = laborQuery.eq('department_id', departmentFilter);
@@ -623,119 +548,46 @@ const ReportAPI = {
                 return aNum - bNum;
             });
 
-            // Fetch 1 day before and after to handle boundary Fridays
-            // (e.g. Friday = 1st of month needs Thursday from previous month)
-            const prevDay = new Date(year, month - 1, 0); // last day of prev month
-            const nextDay = new Date(year, month, 1);      // first day of next month
-            const fetchFrom = prevDay.toISOString().split('T')[0];
-            const fetchTo = nextDay.toISOString().split('T')[0];
-
-            let attendanceQuery = supabaseClient
-                .from('daily_attendance')
-                .select('labor_id, date, final_status, first_login, last_logout, approved_by')
-                .eq('client_id', AUTH.getClientId())
-                .gte('date', fetchFrom)
-                .lte('date', fetchTo);
+            // 14 days around the month: the working days before / after a Friday or holiday run (sandwich rule)
+            const fetchFrom = AttendanceRules.addDays(startDate, -14);
+            const fetchTo = AttendanceRules.addDays(endDate, 14);
 
             // (no department filter here: labors moved between departments keep their earlier days; the labor list above is already filtered)
+            const attendance = await this._fetchAll(() => supabaseClient
+                .from('daily_attendance')
+                .select('labor_id, date, final_status, first_login, last_logout, total_hours, approved_by')
+                .eq('client_id', clientId)
+                .gte('date', fetchFrom)
+                .lte('date', fetchTo)
+                .order('date').order('labor_id'));
 
-            const [{ data: attendance, error: attError }] = await Promise.all([attendanceQuery]);
-            if (attError) throw attError;
-
-            // Paginate punch_records to bypass Supabase server-side 1000-row cap
-            const billingPunches = [];
-            const bPageSize = 1000;
-            let bFrom = 0;
-            while (true) {
-                let bQ = supabaseClient
-                    .from('punch_records')
-                    .select('labor_id, date, time, type, is_night_shift_end')
-                    .eq('client_id', AUTH.getClientId())
-                    .gte('date', fetchFrom)
-                    .lte('date', fetchTo)
-                    .order('date').order('time')
-                    .range(bFrom, bFrom + bPageSize - 1);
-                const { data: bPage, error: bErr } = await bQ;
-                if (bErr) throw bErr;
-                billingPunches.push(...(bPage || []));
-                if (!bPage || bPage.length < bPageSize) break;
-                bFrom += bPageSize;
-            }
-
-            // Build punch time map with night-shift-end awareness
-            const punchTimeMap = {};
-            (billingPunches || []).forEach(p => {
-                const key = `${p.labor_id}_${p.date}`;
-                if (!punchTimeMap[key]) punchTimeMap[key] = { firstIn: null, lastOut: null, nightEnd: null };
-                if (p.is_night_shift_end) {
-                    // an OUT that ended a night shift; an IN after it (a second session) is not part of the first-IN / last-OUT times
-                    if (p.type !== 'login' && (!punchTimeMap[key].nightEnd || p.time > punchTimeMap[key].nightEnd))
-                        punchTimeMap[key].nightEnd = p.time;
-                } else {
-                    // hours = first IN to the LAST OUT of the day; an open second IN does not move the last OUT
-                    if (!punchTimeMap[key].firstIn || p.time < punchTimeMap[key].firstIn)
-                        punchTimeMap[key].firstIn = p.time;
-                    if (p.type !== 'login' && (!punchTimeMap[key].lastOut || p.time > punchTimeMap[key].lastOut))
-                        punchTimeMap[key].lastOut = p.time;
-                }
-            });
-            for (const entry of Object.values(punchTimeMap)) {
-                if (entry.nightEnd) { entry.lastOut = entry.nightEnd; if (!entry.firstIn) entry.firstIn = entry.nightEnd; }
-                if (!entry.firstIn) entry.firstIn = entry.lastOut;
-                if (!entry.lastOut) entry.lastOut = entry.firstIn;   // only an IN so far: shown as before (same time, 0 hours)
-            }
-
-            // Get holidays — extend range ±1 day to match attendance buffer (cross-month blocks)
             const { data: holidaysData } = await supabaseClient
                 .from('holidays')
                 .select('date, name')
-                .eq('client_id', AUTH.getClientId())
+                .eq('client_id', clientId)
                 .eq('is_active', true)
                 .gte('date', fetchFrom)
                 .lte('date', fetchTo);
 
             const holidayMap = {};
-            (holidaysData || []).forEach(h => {
-                holidayMap[h.date] = h.name;
-            });
+            (holidaysData || []).forEach(h => { holidayMap[h.date] = h.name; });
 
             const attendanceMap = {};
-            (attendance || []).forEach(a => {
-                const key = `${a.labor_id}_${a.date}`;
-                attendanceMap[key] = {
-                    status: a.final_status,
-                    firstIn: a.first_login,
-                    lastOut: a.last_logout,
-                    approved_by: a.approved_by
-                };
-            });
+            attendance.forEach(a => { attendanceMap[`${a.labor_id}_${a.date}`] = a; });
 
-            // Prefer live punch data over stale daily_attendance for status computation.
-            // Falls back to daily_attendance only for manual approvals (approved_by set, or LP/LH/LA).
-            const getStatus = (laborId, dateStr, minHrs) => {
-                const pt = punchTimeMap[`${laborId}_${dateStr}`];
-                if (pt) {
-                    const mins = this.calculateHours(pt.firstIn, pt.lastOut);
-                    if (mins > 0) {
-                        const rec = attendanceMap[`${laborId}_${dateStr}`];
-                        if (rec && (rec.approved_by || ['LP', 'LH', 'LA'].includes(rec.status))) return rec.status;
-                        return this.determineStatus(mins, minHrs);
-                    }
-                }
-                return attendanceMap[`${laborId}_${dateStr}`]?.status || 'A';
-            };
+            const switches = await this._sandwichSwitches(clientId);
+            const today = AttendanceRules.today();
 
             // Salary history ("from this date on"), so each day is paid with the salary valid on that day.
             // Only administrators can read it; for anybody else the labor's current salary is used for the whole month.
-            const monthEndStr = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
             const salaryHistory = {};
             try {
                 for (let from = 0; ; from += 1000) {
                     const { data: sal, error: salError } = await supabaseClient
                         .from('labor_salaries')
                         .select('labor_id, from_date, monthly_salary')
-                        .eq('client_id', AUTH.getClientId())
-                        .lte('from_date', monthEndStr)
+                        .eq('client_id', clientId)
+                        .lte('from_date', endDate)
                         .order('from_date', { ascending: true }).order('id')
                         .range(from, from + 999);
                     if (salError) throw salError;
@@ -750,15 +602,18 @@ const ReportAPI = {
             };
 
             const reportData = laborers.map(laborer => {
-                const doj = new Date(laborer.date_of_joining);
-                const lastWorkingDate = laborer.last_working_date ? new Date(laborer.last_working_date) : null;
-                const minHours = deptMinHoursMap[laborer.department_id] || '09:30';
-                let salaryAccum = 0;                 // sum over the days of (paid part of the day x salary of that day)
+                const doj = laborer.date_of_joining || null;
+                const lwd = laborer.last_working_date || null;
+                const statusOf = dateStr => {
+                    if (dateStr >= today) return null;                                         // not finished yet
+                    if ((doj && dateStr < doj) || (lwd && dateStr > lwd)) return null;
+                    return AttendanceRules.workingStatus(attendanceMap[`${laborer.labor_id}_${dateStr}`]);
+                };
+                let salaryAccum = 0;                 // sum over the days of (paid day x salary of that day)
                 const salaryValues = new Set();
 
                 const days = {};
                 let presentCount = 0;
-                let halfDayCount = 0;
                 let absentCount = 0;
                 let fridayCount = 0;
                 let holidayCount = 0;
@@ -766,52 +621,44 @@ const ReportAPI = {
 
                 for (let day = 1; day <= lastDay; day++) {
                     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                    const dateObj = new Date(dateStr);
-                    const isFriday = dateObj.getDay() === 5;
-                    const isBeforeDOJ = dateObj < doj;
-                    const isAfterLWD = lastWorkingDate && dateObj > lastWorkingDate;
-
-                    const key = `${laborer.labor_id}_${dateStr}`;
-                    const record = attendanceMap[key] || null;
-                    const punchTimes = punchTimeMap[key] || null;
-                    let firstIn = punchTimes ? punchTimes.firstIn : (record ? record.firstIn : null);
-                    let lastOut = punchTimes ? punchTimes.lastOut : (record ? record.lastOut : null);
-                    let workedMinutes = this.calculateHours(firstIn, lastOut);
-                    let status = null;
+                    const record = attendanceMap[`${laborer.labor_id}_${dateStr}`] || null;
+                    const offDay = AttendanceRules.offDay(dateStr, holidayMap);
+                    let firstIn = record ? record.first_login : null;
+                    let lastOut = record ? record.last_logout : null;
+                    let status;
                     let hours = '';
 
-                    if (isBeforeDOJ || isAfterLWD) {
+                    if ((doj && dateStr < doj) || (lwd && dateStr > lwd)) {
                         status = 'A';
-                        absentCount++;
                         firstIn = null;
                         lastOut = null;
-                        workedMinutes = 0;
-
-                    } else if (holidayMap[dateStr]) {
-                        status = 'NH';
-                        holidayCount++;
+                    } else if (offDay) {
+                        // Friday / holiday: paid whether punched or not, unless the sandwich rule applies (an approval still pays it)
+                        status = offDay;
+                        if (AttendanceRules.sandwiched(dateStr, holidayMap, switches, statusOf)) {
+                            const approved = !!(record && record.approved_by && String(record.approved_by).trim());
+                            status = approved ? AttendanceRules.workingStatus(record) : 'A';
+                        }
                         firstIn = null;
                         lastOut = null;
-                        workedMinutes = 0;
-
-                    } else if (isFriday) {
-                        status = 'F';
-                        fridayCount++;
-                        firstIn = null;
-                        lastOut = null;
-                        workedMinutes = 0;
-
                     } else {
-                        status = getStatus(laborer.labor_id, dateStr, minHours);
-                        if (status === 'P') { presentCount++; hours = this.formatMinutesToHHMM(workedMinutes); totalMinutes += workedMinutes; }
-                        else if (status === 'H') { halfDayCount++; hours = this.formatMinutesToHHMM(workedMinutes); totalMinutes += workedMinutes; }
-                        else absentCount++;
+                        status = AttendanceRules.workingStatus(record);
+                        if (status === 'P' && record && Number(record.total_hours) > 0) {
+                            const mins = Math.round(Number(record.total_hours) * 60);
+                            hours = this.formatMinutesToHHMM(mins);
+                            totalMinutes += mins;
+                        }
                     }
 
-                    const paidPart = (status === 'P' || status === 'F' || status === 'NH') ? 1 : (status === 'H' ? 0.5 : 0);
+                    if (status === 'P') presentCount++;
+                    else if (status === 'F') fridayCount++;
+                    else if (status === 'NH') holidayCount++;
+                    else absentCount++;
+
+                    const paid = status === 'P' || status === 'F' || status === 'NH';
                     const salaryToday = salaryOn(laborer, dateStr);
                     salaryValues.add(salaryToday);
-                    salaryAccum += paidPart * salaryToday;
+                    if (paid) salaryAccum += salaryToday;
 
                     days[day] = {
                         status: status,
@@ -821,12 +668,12 @@ const ReportAPI = {
                     };
                 }
 
-                // P*1 + F*1 + NH*1 + H*0.5
-                const totalPaidDays = presentCount + fridayCount + holidayCount + (halfDayCount * 0.5);
+                // P + F + NH
+                const totalPaidDays = presentCount + fridayCount + holidayCount;
 
                 // Salary based on the actual days in the month (28/29/30/31); each day uses the salary valid on that day
                 const calculatedSalary = Math.round(salaryAccum / lastDay);
-                const monthlySalary = salaryOn(laborer, monthEndStr);     // shown: the salary at the end of the month
+                const monthlySalary = salaryOn(laborer, endDate);     // shown: the salary at the end of the month
 
                 return {
                     laborId: laborer.labor_id,
@@ -839,7 +686,6 @@ const ReportAPI = {
                     salaryChanged: salaryValues.size > 1,
                     days,
                     presentCount,
-                    halfDayCount,
                     absentCount,
                     fridayCount,
                     holidayCount,
@@ -850,8 +696,8 @@ const ReportAPI = {
                 };
             });
 
-            return { 
-                success: true, 
+            return {
+                success: true,
                 data: reportData,
                 meta: { year, month, totalDays: lastDay, startDate, endDate }
             };
@@ -895,7 +741,6 @@ const ReportAPI = {
             const { data: todayAttendance } = await attendanceQuery;
 
             const todayPresent = todayAttendance?.filter(a => a.final_status === 'P').length || 0;
-            const todayHalfDay = todayAttendance?.filter(a => a.final_status === 'H').length || 0;
             const todayAbsent = todayAttendance?.filter(a => a.final_status === 'A').length || 0;
 
             let punchQuery = supabaseClient
@@ -918,7 +763,7 @@ const ReportAPI = {
                 .select('id', { count: 'exact', head: true })
                 .eq('client_id', AUTH.getClientId())
                 .eq('date', today)
-                .in('final_status', ['H', 'A'])
+                .eq('final_status', 'A')
                 .is('approved_by', null);
 
             if (departmentFilter) {
@@ -934,7 +779,6 @@ const ReportAPI = {
                     activeLaborers,
                     faceEnrolled,
                     todayPresent,
-                    todayHalfDay,
                     todayAbsent,
                     todayLogins,
                     todayLogouts,

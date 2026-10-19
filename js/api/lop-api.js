@@ -107,7 +107,7 @@ const LOPAPI = {
     },
 
     // Approve single LOP request
-    async approve(requestId, approvedStatus = null) {
+    async approve(requestId) {
         try {
             const session = AUTH.getSession();
 
@@ -123,7 +123,7 @@ const LOPAPI = {
                 return { success: false, error: 'Request not found' };
             }
 
-            const finalStatus = approvedStatus || current.requested_status;
+            const finalStatus = 'P';      // no half day (migration 022): an approved request always makes the day Present
 
             // Update LOP request
             const { data, error } = await supabaseClient
@@ -148,7 +148,7 @@ const LOPAPI = {
                     labor_id: current.labor_id,
                     department_id: current.department_id,
                     date: current.date,
-                    auto_status: current.auto_status,
+                    auto_status: 'A',
                     final_status: finalStatus,
                     lop_request_id: requestId,
                     approved_by: session.name,
@@ -242,13 +242,13 @@ const LOPAPI = {
         try {
             const departmentFilter = departmentId || AUTH.getDepartmentFilter();
 
-            // Get daily attendance records with H or A status
+            // Get daily attendance records that are Absent
             let query = supabaseClient
                 .from('daily_attendance')
                 .select('labor_id, department_id, date, auto_status')
                 .eq('client_id', AUTH.getClientId())
                 .eq('date', date)
-                .in('auto_status', ['H', 'A']);
+                .eq('auto_status', 'A');
 
             if (departmentFilter) {
                 query = query.eq('department_id', departmentFilter);
@@ -277,7 +277,7 @@ const LOPAPI = {
                             department_id: record.department_id,
                             date: record.date,
                             auto_status: record.auto_status,
-                            requested_status: record.auto_status === 'H' ? 'P' : 'H',
+                            requested_status: 'P',
                             remarks: 'Auto-generated',
                             approval_status: 'pending',
                             client_id: AUTH.getClientId()
@@ -307,7 +307,7 @@ const LOPAPI = {
 
             if (!attendance) return { success: false, error: 'No attendance record' };
 
-            // Only create draft if H or A with some hours (meaning they punched)
+            // Only create a draft for an Absent day with some hours (meaning they punched)
             const hours = parseFloat(attendance.total_hours) || 0;
             if (hours === 0) return { success: false, error: 'No punch - skip auto draft' };
             if (attendance.auto_status === 'P') return { success: false, error: 'Already present' };
@@ -324,7 +324,7 @@ const LOPAPI = {
             if (existing) return { success: false, error: 'Request already exists' };
 
             // Create draft
-            const requestedStatus = attendance.auto_status === 'A' ? 'H' : 'P';
+            const requestedStatus = 'P';
 
             const { data, error } = await supabaseClient
                 .from('lop_requests')

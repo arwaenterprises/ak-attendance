@@ -342,12 +342,13 @@
 
     <!-- Supabase JS -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="../js/config/supabase.js?v=104"></script>
-    <script src="../js/auth/auth.js?v=104"></script>
-    <script src="../js/utils/date-utils.js?v=104"></script>
-    <script src="../js/ui/sync-indicator.js?v=104"></script>
-    <script src="../js/ui/toast.js?v=104"></script>
-    <script src="../js/api/report-api.js?v=104"></script>
+    <script src="../js/config/supabase.js?v=105"></script>
+    <script src="../js/auth/auth.js?v=105"></script>
+    <script src="../js/utils/date-utils.js?v=105"></script>
+    <script src="../js/ui/sync-indicator.js?v=105"></script>
+    <script src="../js/ui/toast.js?v=105"></script>
+    <script src="../js/utils/attendance-rules.js?v=105"></script>
+    <script src="../js/api/report-api.js?v=105"></script>
 
     <script>
         if (!AUTH.requireLogin()) {
@@ -540,7 +541,7 @@
                 let hoursDisplay = '-';
                 let hoursClass = '';
                 if (row.totalHours) {
-                    const mins = ReportAPI.calculateHours(row.firstIn, row.lastOut);
+                    const mins = Math.round(Number(row.totalHours) * 60);      // first IN to last OUT, from the database
                     const h = (mins / 60).toFixed(1);
                     hoursDisplay = h + 'h';
                     if (parseFloat(h) < 10) hoursClass = 'low';
@@ -803,6 +804,6 @@
         // ─── Initialize ──────────────────────────────────────────
         init();
     </script>
-    <script src="../js/ui/app-update.js?v=104"></script>
+    <script src="../js/ui/app-update.js?v=105"></script>
 </body>
 </html>

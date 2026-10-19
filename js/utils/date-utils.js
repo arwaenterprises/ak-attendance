@@ -38,9 +38,10 @@ const DateUtils = {
         return time;
     },
 
-    // Get today's date as YYYY-MM-DD
+    // Get today's date as YYYY-MM-DD (the device's own date; the UTC date was a day behind between 00:00 and 03:00 in Saudi Arabia)
     today() {
-        return new Date().toISOString().split('T')[0];
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     },
 
     // Get current time as HH:MM:SS

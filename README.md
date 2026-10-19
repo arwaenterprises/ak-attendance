@@ -5,7 +5,8 @@ One installation serves many companies (each company only sees its own data).
 
 ## What it does
 
-- **Punch terminal** (`punch/`): the labor types the ID, presses IN or OUT, the face is checked in the oval, a photo is kept. Works offline and syncs later. "View my attendance" shows the month (green = worked in full or approved, red = otherwise, today grey).
+- **Punch terminal** (`punch/`): the labor types the ID, presses IN or OUT, the face is checked in the oval, a photo is kept. Works offline and syncs later. "View my attendance" shows the month (green = worked the full hours, approved, or a paid Friday / holiday; red = otherwise; today grey).
+- **Day rules** (one set everywhere: daily report, overtime, 3PL, month screen): Present only with the full required hours (shift, else department, else Settings; there is no half day), otherwise Absent; an administrator's approval makes a day Present; Friday and holidays are always paid, punched or not, unless the sandwich rule in Settings applies (absent on the working day before AND after). Code: migration 022 (`_recalc_attendance`) and `js/utils/attendance-rules.js`.
 - **Administrator**: departments (Active / Inactive, move labors), labor master and import, face enrollment (also by a one-hour, single-use link), shifts (Day / Night with history), roles with default salary and overtime rate, salary history ("from which day"), punch locations, holidays, LOP approval, daily / monthly / overtime / 3PL billing reports.
 - **Platform owner**: creates and manages companies.
 

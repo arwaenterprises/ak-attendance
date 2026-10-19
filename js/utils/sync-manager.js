@@ -297,19 +297,16 @@ const SyncManager = {
                     .from('settings')
                     .select('key, value')
                     .eq('client_id', clientId)
-                    .in('key', ['min_hours_present', 'min_hours_half_day']);
+                    .eq('key', 'min_hours_present');
 
-                let minPresent = 10, minHalf = 4;
+                let minPresent = 9.5;
                 if (settings) {
                     settings.forEach(s => {
                         if (s.key === 'min_hours_present') minPresent = parseFloat(s.value);
-                        if (s.key === 'min_hours_half_day') minHalf = parseFloat(s.value);
                     });
                 }
 
-                if (totalHours >= minPresent) status = 'P';
-                else if (totalHours >= minHalf) status = 'H';
-                else status = 'A';
+                status = totalHours >= minPresent ? 'P' : 'A';      // no half day
             }
 
             // Get department
