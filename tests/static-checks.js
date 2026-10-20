@@ -99,6 +99,30 @@ const modeCopies = [];
 check("no page or script mentions DAWAM_AUTH_MODE (the old login mode switch is gone; a page with its own copy once broke self-enrollment on the live site)", modeCopies.length === 0, modeCopies.join(', '));
 check('the old login is gone: no file mentions DAWAM_AUTH_MODE any more', !/DAWAM_AUTH_MODE/.test(supaJs));
 
+// every app object a page's own script uses (PhotoUtils., LaborAPI. ...) is loaded by that page
+// (labor/enroll.html used PhotoUtils without loading photo-utils.js from v91 to v105: "PhotoUtils is not defined" at enrolment)
+{
+  const owners = {};
+  (function walkJs(dir) { for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) walkJs(p);
+    else if (e.name.endsWith('.js') && !p.includes(path.sep + 'vendor' + path.sep)) {
+      for (const m of fs.readFileSync(p, 'utf8').matchAll(/^const (\w+)\s*=/gm)) owners[m[1]] = path.relative(ROOT, p).split(path.sep).join('/');
+    }
+  } })(path.join(ROOT, 'js'));
+  const missingGlobals = [];
+  for (const pagePath of pages) {
+    const page = path.relative(ROOT, path.resolve(ROOT, pagePath)).split(path.sep).join('/');
+    const html = fs.readFileSync(path.join(ROOT, page), 'utf8');
+    const loaded = [...html.matchAll(/<script[^>]*src="([^"?]+)/g)].map(m => path.posix.normalize(path.posix.join(path.posix.dirname(page), m[1])));
+    const inline = [...html.matchAll(/<script(?![^>]*\ssrc=)[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]).join('\n');
+    for (const [name, file] of Object.entries(owners)) {
+      if (new RegExp('\\b' + name + '\\.').test(inline) && !loaded.includes(file) && !new RegExp('(const|let|var)\\s+' + name + '\\b').test(inline)) missingGlobals.push(`${page}: uses ${name} but does not load ${file}`);
+    }
+  }
+  check('every app object a page uses is loaded by that page', missingGlobals.length === 0, missingGlobals.slice(0, 8).join('\n        '));
+}
+
 // version must be bumped when app files changed (CI sets BASE_SHA)
 const base = process.env.BASE_SHA;
 if (base && !/^0+$/.test(base)) {
