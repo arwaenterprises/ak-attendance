@@ -647,7 +647,15 @@
 
             } catch (err) {
                 console.error('Submit error:', err);
-                alert('Failed to submit. Please try again.');
+                // say WHY (before: always "Failed to submit", whatever happened)
+                const msg = String((err && (err.message || err.error)) || err || '');
+                let why = 'Failed to submit. Please try again.';
+                if (/expired/i.test(msg)) why = 'This link has expired. Please ask for a new enrollment link.';
+                else if (/already been used/i.test(msg)) why = 'This link has already been used. Your enrollment is waiting for approval.';
+                else if (/row-level security|unauthori[sz]ed|403/i.test(msg)) why = 'The photo was not accepted: this link has expired or was already used. Please ask for a new enrollment link.';
+                else if (/fetch|network|timeout|load failed/i.test(msg)) why = 'No internet connection. Check the connection and press Submit again.';
+                else if (msg) why = 'Failed to submit: ' + msg + '. Please try again.';
+                alert(why);
                 document.getElementById('submittingState').classList.add('hidden');
                 document.getElementById('previewState').classList.remove('hidden');
                 submitBtn.disabled = false;
@@ -655,6 +663,6 @@
             }
         }
     </script>
-    <script src="../js/ui/app-update.js?v=106"></script>
+    <script src="../js/ui/app-update.js?v=107"></script>
 </body>
 </html>
