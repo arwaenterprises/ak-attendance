@@ -644,18 +644,18 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="../js/config/supabase.js?v=109"></script>
-    <script src="../js/utils/date-utils.js?v=109"></script>
-    <script src="../js/utils/photo-utils.js?v=109"></script>
-    <script src="../js/utils/offline-storage.js?v=109"></script>
-    <script src="../js/utils/sync-manager.js?v=109"></script>
-    <script src="../js/api/labor-api.js?v=109"></script>
-    <script src="../js/api/punch-api.js?v=109"></script>
-    <script src="../js/utils/attendance-rules.js?v=109"></script>
-    <script src="../js/utils/geo-check.js?v=109"></script>
-    <script src="../js/utils/liveness.js?v=109"></script>
-    <script src="../js/api/terminal-api.js?v=109"></script>
-    <script src="../js/utils/photo-url.js?v=109"></script>
+    <script src="../js/config/supabase.js?v=110"></script>
+    <script src="../js/utils/date-utils.js?v=110"></script>
+    <script src="../js/utils/photo-utils.js?v=110"></script>
+    <script src="../js/utils/offline-storage.js?v=110"></script>
+    <script src="../js/utils/sync-manager.js?v=110"></script>
+    <script src="../js/api/labor-api.js?v=110"></script>
+    <script src="../js/api/punch-api.js?v=110"></script>
+    <script src="../js/utils/attendance-rules.js?v=110"></script>
+    <script src="../js/utils/geo-check.js?v=110"></script>
+    <script src="../js/utils/liveness.js?v=110"></script>
+    <script src="../js/api/terminal-api.js?v=110"></script>
+    <script src="../js/utils/photo-url.js?v=110"></script>
 
     <script>
         // ============ ONE SCREEN, NO SCROLL ============
@@ -1105,7 +1105,8 @@ localStorage.setItem('pwa_client_code', clientCode);
                 if (kind === 'login' && last && last.type === 'login') return refuse('Already punched for the day');
             }
 
-            // 2. the blink (or a small head turn) while the GPS readings finish; a printed photo cannot do either (setting blink_check)
+            // 2. the live-face check while the GPS readings finish: the camera watches the natural movement of the face,
+            //    nothing to do for the labor (a flat photo does not pass, see js/utils/liveness.js; setting blink_check)
             const livenessOn = String(settings.blink_check || 'true') !== 'false';
             let gpsDone = false;
             const gpsResult = gpsPromise.then(readings => {
@@ -1113,20 +1114,23 @@ localStorage.setItem('pwa_client_code', clientCode);
                 gpsDone = true;
                 return { readings, g };
             });
-            let live = !livenessOn;
+            let liveCheck = { live: !livenessOn };
             if (livenessOn) {
-                setStep('Look at the camera', 'Blink your eyes (or turn your head a little)');
+                setStep('Look at the camera', 'Hold the phone in front of your face');
                 setOval('wait');
                 let stop = false;
                 gpsResult.then(r => { if (!r.g.ok) stop = true; });        // a refused location ends the wait at once
                 try {
-                    live = await Liveness.waitForLive(video, 10000, {
+                    liveCheck = await Liveness.waitForLive(video, 8000, {
                         onFace: seen => setOval(seen ? 'seen' : 'wait'),
+                        onSlow: () => setStep('Look at the camera', 'Move your head a little'),
                         stop: () => stop
                     });
-                } catch (e) { console.error('Blink check error:', e); live = false; }
-                if (live) setOval('done');
+                } catch (e) { console.error('Live face check error:', e); liveCheck = { live: false, faceFrames: 0, frames: 0, error: true }; }
+                console.log('[Live face check]', liveCheck);
+                if (liveCheck.live) setOval('done');
             }
+            const live = liveCheck.live;
             if (!gpsDone) setStep('Please wait', 'Checking your location');
             const { readings: gpsReadings, g: gps } = await gpsResult;
             const area = gps.ok ? await findNearestLocationOffline(gps.best.lat, gps.best.lng, currentLabor.department_id) : null;
@@ -1139,7 +1143,9 @@ localStorage.setItem('pwa_client_code', clientCode);
             updateLocationBar(`${currentLocation.name} (${currentLocation.distance}m)`, true);
             if (!live) {
                 endSteps();
-                showStatus('warn', 'Blink not seen', '', 'Hold the phone in front of your face, look at the camera and blink. Please try again.');
+                // say which part failed: the face was not found in the camera, or it was found but did not move like a real face
+                if (!liveCheck.faceFrames) showStatus('warn', 'Face not seen', '', 'Hold the phone in front of your face, in good light. Please try again.');
+                else showStatus('warn', 'Please try again', '', 'Look at the camera and move your head a little.');
                 scheduleReset(5000);
                 return;
             }
@@ -1633,7 +1639,7 @@ localStorage.setItem('pwa_client_code', clientCode);
             updateLocationBar('Offline mode - Punches will sync later', true);
         });
     </script>
-    <script src="../js/ui/app-update.js?v=109"></script>
-    <script src="../js/ui/pwa-install.js?v=109"></script>
+    <script src="../js/ui/app-update.js?v=110"></script>
+    <script src="../js/ui/pwa-install.js?v=110"></script>
 </body>
 </html>

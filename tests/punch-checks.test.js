@@ -48,10 +48,13 @@ const R = (lat, lng, acc) => ({ lat, lng, acc });
   await test('closing the eyes without opening them again is not a blink', () => ok(!run([0.30, 0.31, 0.30, 0.12, 0.10, 0.11])));
   await test('one odd high frame does not make normal eyes look closed', () => ok(!run([0.30, 0.45, 0.30, 0.29, 0.31, 0.30])));
 
-  const turnRun = values => { const d = Liveness.turnDetector(); return values.some(v => d.push(v)); };
-  await test('a small head turn and back is seen', () => ok(turnRun([0.01, 0.00, 0.02, 0.08, 0.16, 0.10, 0.03])));
-  await test('turning without coming back is not enough (the photo must face the camera)', () => ok(!turnRun([0.0, 0.01, 0.0, 0.10, 0.17, 0.18])));
-  await test('a photo (nose stays between the eyes, small jitter) is not a head turn', () => ok(!turnRun([0.01, 0.0, 0.02, 0.03, -0.02, 0.04, 0.01, -0.03])));
+  const moveRun = values => { const d = Liveness.motionDetector(); return values.some(v => d.push(v)); };
+  // a real head sways a few degrees: the nose offset drifts by about 0.05 or more within a second or two
+  await test('natural sway of a real head (a few degrees) is seen', () => ok(moveRun([0.010, 0.015, 0.022, 0.030, 0.041, 0.052, 0.060, 0.058])));
+  await test('a slow drift the other way is seen too', () => ok(moveRun([0.00, -0.01, -0.02, -0.03, -0.04, -0.05, -0.06])));
+  await test('a flat photo (nose stays put, jitter of about 0.02 frame to frame) is not seen as a live face', () =>
+    ok(!moveRun([0.01, -0.01, 0.015, -0.005, 0.01, -0.015, 0.012, -0.008, 0.009, -0.012, 0.011, -0.01])));
+  await test('one wrong frame (a jump) alone does not pass', () => ok(!moveRun([0.0, 0.01, 0.0, 0.08, 0.0, 0.01, 0.0, 0.01])));
   const pts = (noseX) => { const p = []; for (let i = 0; i < 68; i++) p.push({ x: 50, y: 50 }); p[36] = { x: 30, y: 40 }; p[45] = { x: 70, y: 40 }; p[30] = { x: noseX, y: 60 }; return p; };
   await test('nose offset: 0 looking straight, positive when the nose moves right', () => {
     ok(Math.abs(Liveness.noseOffset(pts(50))) < 1e-9); ok(Liveness.noseOffset(pts(58)) > 0.15);
