@@ -41,11 +41,21 @@ const R = (lat, lng, acc) => ({ lat, lng, acc });
   });
   const run = values => { const d = Liveness.blinkDetector(); return values.some(v => d.push(v)); };
   await test('a blink (open, closed, open) is seen', () => ok(run([0.30, 0.31, 0.29, 0.12, 0.30])));
-  await test('a slow blink seen over several frames is seen', () => ok(run([0.30, 0.18, 0.10, 0.11, 0.20, 0.29])));
+  await test('a slow blink seen over several frames is seen', () => ok(run([0.30, 0.29, 0.31, 0.18, 0.10, 0.20, 0.29])));
+  await test('a half blink of narrow eyes (open 0.20, down to 0.14) is seen (no fixed number any more)', () => ok(run([0.20, 0.21, 0.20, 0.14, 0.20])));
   await test('a printed photo (eyes never move) is not a blink', () => ok(!run([0.30, 0.30, 0.31, 0.30, 0.30, 0.29, 0.30, 0.30])));
-  await test('small jitter of open eyes is not a blink', () => ok(!run([0.30, 0.27, 0.31, 0.26, 0.30, 0.28, 0.31])));
-  await test('closing the eyes without opening them again is not a blink', () => ok(!run([0.30, 0.31, 0.12, 0.10, 0.11])));
-  await test('a face whose eyes never look open (closed photo) is not a blink', () => ok(!run([0.15, 0.10, 0.16, 0.10, 0.15])));
+  await test('normal jitter of open eyes (about 10 %) is not a blink', () => ok(!run([0.30, 0.28, 0.31, 0.29, 0.30, 0.28, 0.31, 0.29])));
+  await test('closing the eyes without opening them again is not a blink', () => ok(!run([0.30, 0.31, 0.30, 0.12, 0.10, 0.11])));
+  await test('one odd high frame does not make normal eyes look closed', () => ok(!run([0.30, 0.45, 0.30, 0.29, 0.31, 0.30])));
+
+  const turnRun = values => { const d = Liveness.turnDetector(); return values.some(v => d.push(v)); };
+  await test('a small head turn and back is seen', () => ok(turnRun([0.01, 0.00, 0.02, 0.08, 0.16, 0.10, 0.03])));
+  await test('turning without coming back is not enough (the photo must face the camera)', () => ok(!turnRun([0.0, 0.01, 0.0, 0.10, 0.17, 0.18])));
+  await test('a photo (nose stays between the eyes, small jitter) is not a head turn', () => ok(!turnRun([0.01, 0.0, 0.02, 0.03, -0.02, 0.04, 0.01, -0.03])));
+  const pts = (noseX) => { const p = []; for (let i = 0; i < 68; i++) p.push({ x: 50, y: 50 }); p[36] = { x: 30, y: 40 }; p[45] = { x: 70, y: 40 }; p[30] = { x: noseX, y: 60 }; return p; };
+  await test('nose offset: 0 looking straight, positive when the nose moves right', () => {
+    ok(Math.abs(Liveness.noseOffset(pts(50))) < 1e-9); ok(Liveness.noseOffset(pts(58)) > 0.15);
+  });
 
   process.exit(summary());
 })();

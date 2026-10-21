@@ -185,7 +185,13 @@
         .face-stage { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 5; text-align: center; color: #F8FAFC; background: rgba(11,18,32,0.82); border-radius: 18px; padding: 10px 22px; display: none; pointer-events: none; }
         .face-stage.on { display: block; }
         .face-stage .t { font-size: 20px; font-weight: 800; }
-        .face-stage .n { font-size: 44px; font-weight: 800; line-height: 1.1; color: #4ADE80; font-variant-numeric: tabular-nums; }
+        .face-stage { width: min(92vw, 380px); box-sizing: border-box; }
+        .face-stage .s { font-size: 16px; font-weight: 600; color: #CBD5E1; margin-top: 2px; }
+        /* the oval tells the labor what the camera sees: white = no face yet, green = face seen, bright flash = blink seen */
+        .face-guide { transition: border-color .15s, box-shadow .15s; }
+        .face-guide.wait { border-color: rgba(248,250,252,0.85); }
+        .face-guide.seen { border-color: #4ADE80; }
+        .face-guide.done { border-color: #A3E635; box-shadow: 0 0 0 9999px rgba(11,18,32,0.35), 0 0 46px rgba(163,230,53,0.8); }
         .id-input-panel input { width: 100%; padding: 0 16px; height: 56px; font-size: 26px; font-weight: 800; letter-spacing: 1px; background: #111C30; color: #F8FAFC; border: 2px solid #38BDF8; border-radius: 14px; text-align: left; text-transform: uppercase; outline: none; }
         .id-input-panel input::placeholder { font-size: 17px; font-weight: 600; letter-spacing: 0; color: #64748B; text-transform: none; }
         .id-input-panel input:focus { border-color: #7DD3FC; }
@@ -562,7 +568,7 @@
             <video id="video" autoplay playsinline></video>
             <canvas id="canvas"></canvas>
             <div class="face-guide" id="faceGuide"></div>
-            <div class="face-stage" id="faceStage"><div class="t">Look into the oval</div><div class="n" id="faceCount"></div></div>
+            <div class="face-stage" id="faceStage" role="status" aria-live="polite"><div class="t" id="stepTitle"></div><div class="s" id="stepSub"></div></div>
             
             <!-- Location chip -->
             <div class="location-bar" id="locationBar">Detecting location...</div>
@@ -638,18 +644,18 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="../js/config/supabase.js?v=108"></script>
-    <script src="../js/utils/date-utils.js?v=108"></script>
-    <script src="../js/utils/photo-utils.js?v=108"></script>
-    <script src="../js/utils/offline-storage.js?v=108"></script>
-    <script src="../js/utils/sync-manager.js?v=108"></script>
-    <script src="../js/api/labor-api.js?v=108"></script>
-    <script src="../js/api/punch-api.js?v=108"></script>
-    <script src="../js/utils/attendance-rules.js?v=108"></script>
-    <script src="../js/utils/geo-check.js?v=108"></script>
-    <script src="../js/utils/liveness.js?v=108"></script>
-    <script src="../js/api/terminal-api.js?v=108"></script>
-    <script src="../js/utils/photo-url.js?v=108"></script>
+    <script src="../js/config/supabase.js?v=109"></script>
+    <script src="../js/utils/date-utils.js?v=109"></script>
+    <script src="../js/utils/photo-utils.js?v=109"></script>
+    <script src="../js/utils/offline-storage.js?v=109"></script>
+    <script src="../js/utils/sync-manager.js?v=109"></script>
+    <script src="../js/api/labor-api.js?v=109"></script>
+    <script src="../js/api/punch-api.js?v=109"></script>
+    <script src="../js/utils/attendance-rules.js?v=109"></script>
+    <script src="../js/utils/geo-check.js?v=109"></script>
+    <script src="../js/utils/liveness.js?v=109"></script>
+    <script src="../js/api/terminal-api.js?v=109"></script>
+    <script src="../js/utils/photo-url.js?v=109"></script>
 
     <script>
         // ============ ONE SCREEN, NO SCROLL ============
@@ -1037,21 +1043,22 @@ localStorage.setItem('pwa_client_code', clientCode);
             setTimeout(() => errorEl.style.display = 'none', 4000);
         }
 
-        // Hide the ID box + buttons and let the labor line up with the oval (FACE_COUNTDOWN_SECONDS, default 3), then the photo is taken
-        window.FACE_COUNTDOWN_SECONDS = 3;
-        async function faceStage() {
-            const input = document.getElementById('laborIdInput');
-            if (input) input.blur();
-            document.getElementById('idInputPanel').classList.add('hidden');
-            const stage = document.getElementById('faceStage'), count = document.getElementById('faceCount');
-            stage.classList.add('on');
-            for (let n = Number(window.FACE_COUNTDOWN_SECONDS) || 0; n > 0; n--) {
-                count.textContent = n;
-                await new Promise(r => setTimeout(r, 1000));
-            }
-            count.textContent = '';
-            stage.classList.remove('on');
+        // ===== The punch, on ONE live camera screen =====
+        // The camera never goes away until the result: a small panel at the bottom says what is happening, and the oval shows
+        // whether a face is seen (white = no face, green = face seen, flashes when the blink / head turn is seen).
+        function setStep(title, sub) {
+            const stage = document.getElementById('faceStage');
+            document.getElementById('stepTitle').textContent = title || '';
+            document.getElementById('stepSub').textContent = sub || '';
+            stage.classList.toggle('on', !!title);
         }
+        function setOval(state) {                 // '' (normal) | 'wait' (no face yet) | 'seen' | 'done'
+            const g = document.getElementById('faceGuide');
+            g.classList.toggle('wait', state === 'wait');
+            g.classList.toggle('seen', state === 'seen');
+            g.classList.toggle('done', state === 'done');
+        }
+        function endSteps() { setStep(''); setOval(''); }
 
         // Process punch
         async function processPunch(kind) {
@@ -1063,45 +1070,84 @@ localStorage.setItem('pwa_client_code', clientCode);
             }
             if (!(await verifyLaborId())) return;
 
-            // fresh GPS readings while the labor lines up with the oval (the database checks them again, migration 024)
-            const gpsPromise = GeoCheck.collect(3, 3000);
-
-            // ID is fine: the ID box and the buttons go away, only the oval stays; a short countdown, then the photo
-            await faceStage();
-
             isPunching = true;
             setPunchButtons(false);
+            const input = document.getElementById('laborIdInput');
+            if (input) input.blur();
+            document.getElementById('idInputPanel').classList.add('hidden');
+            const video = document.getElementById('video');
+            const refuse = (msg, ms) => { endSteps(); showStatus('warn', msg, '', `<span class="who">${esc(currentLabor.name)}</span>`); scheduleReset(ms || 7000); };
 
-            const gpsReadings = await gpsPromise;
-            const gps = GeoCheck.judge(gpsReadings, settings);
+            // 1. at once, side by side: fresh GPS readings (the database checks them again, migration 024) and the IN / OUT rules
+            setStep('Please wait', 'Checking your location');
+            const gpsPromise = GeoCheck.collect(3, 3000);
+            const online = !isOfflineMode && navigator.onLine;
+            let shiftName = null;
+            if (online) {
+                const limitCheck = await TerminalAPI.checkPunchLimit(currentLabor.labor_id);
+                if (limitCheck.success && !limitCheck.allowed) return refuse(`Punch limit reached (${limitCheck.max} per day)`);
+                const chk = await TerminalAPI.checkPunch(currentLabor.labor_id, kind, DateUtils.today(), DateUtils.now());
+                if (chk.success) {
+                    if (!chk.allowed) return refuse(plainRefusal(chk.message) || 'Punch not allowed');
+                    shiftName = chk.shiftName || null;
+                    if (kind === 'logout' && chk.early) {
+                        endSteps();
+                        const leave = await confirmEarlyLeave(currentLabor.name, chk.workedMinutes, chk.requiredMinutes, chk.remainingMinutes);
+                        if (!leave) { resetTerminal(); return; }     // Stay: nothing recorded, back to the start
+                        document.getElementById('statusOverlay').classList.remove('active');
+                    }
+                }
+            } else {
+                // offline: refuse a repeated IN from what this device knows (an OUT is never refused here: the database decides)
+                const unsynced = await OfflineStorage.getUnsyncedPunches();
+                const mine = unsynced.filter(p => p.laborId === currentLabor.labor_id && p.date === DateUtils.today());
+                const last = mine[mine.length - 1];
+                if (kind === 'login' && last && last.type === 'login') return refuse('Already punched for the day');
+            }
+
+            // 2. the blink (or a small head turn) while the GPS readings finish; a printed photo cannot do either (setting blink_check)
+            const livenessOn = String(settings.blink_check || 'true') !== 'false';
+            let gpsDone = false;
+            const gpsResult = gpsPromise.then(readings => {
+                const g = GeoCheck.judge(readings, settings);
+                gpsDone = true;
+                return { readings, g };
+            });
+            let live = !livenessOn;
+            if (livenessOn) {
+                setStep('Look at the camera', 'Blink your eyes (or turn your head a little)');
+                setOval('wait');
+                let stop = false;
+                gpsResult.then(r => { if (!r.g.ok) stop = true; });        // a refused location ends the wait at once
+                try {
+                    live = await Liveness.waitForLive(video, 10000, {
+                        onFace: seen => setOval(seen ? 'seen' : 'wait'),
+                        stop: () => stop
+                    });
+                } catch (e) { console.error('Blink check error:', e); live = false; }
+                if (live) setOval('done');
+            }
+            if (!gpsDone) setStep('Please wait', 'Checking your location');
+            const { readings: gpsReadings, g: gps } = await gpsResult;
             const area = gps.ok ? await findNearestLocationOffline(gps.best.lat, gps.best.lng, currentLabor.department_id) : null;
             if (!gps.ok || !area.success) {
                 const msg = !gps.ok ? gps.message : 'You are outside the authorized punch area';
                 updateLocationBar(msg, false);
-                showStatus('warn', msg, '', `<span class="who">${esc(currentLabor.name)}</span>`);
-                scheduleReset(7000);
-                return;
+                return refuse(msg);
             }
             currentLocation = area.location;
             updateLocationBar(`${currentLocation.name} (${currentLocation.distance}m)`, true);
-
-            // blink check: a printed photo or a photo on another phone cannot blink (setting blink_check, default on)
-            if (String(settings.blink_check || 'true') !== 'false') {
-                showStatus('info', 'Please blink', '', 'Look at the camera and blink your eyes slowly');
-                let blinked = false;
-                try { blinked = await Liveness.waitForBlink(document.getElementById('video'), 8000); } catch (e) { console.error('Blink check error:', e); }
-                if (!blinked) {
-                    showStatus('warn', 'Blink not seen', '', 'Look straight at the camera and blink slowly. Please try again.');
-                    scheduleReset(5000);
-                    return;
-                }
+            if (!live) {
+                endSteps();
+                showStatus('warn', 'Blink not seen', '', 'Hold the phone in front of your face, look at the camera and blink. Please try again.');
+                scheduleReset(5000);
+                return;
             }
 
-            showStatus('info', 'Checking your face', '', 'Look at the camera and hold still');
+            // 3. the photo is taken from the live camera at once; the face is compared while the camera stays on screen
+            setStep('Checking your face', 'Hold still');
 
             try {
-                // Capture photo
-                const video = document.getElementById('video');
                 const { canvas, blob: photoBlob } = await PhotoUtils.capturePhoto(video, true);
 
                 // Detect face
@@ -1132,57 +1178,8 @@ localStorage.setItem('pwa_client_code', clientCode);
                     throw new Error(`Face not matched (${confidence}% confidence). Please try again or contact supervisor.`);
                 }
 
-                // Check punch limit (skip if offline)
-                if (!isOfflineMode && navigator.onLine) {
-                    const limitCheck = await TerminalAPI.checkPunchLimit(currentLabor.labor_id);
-                    if (!limitCheck.allowed) {
-                        throw new Error(`Punch limit reached (${limitCheck.max} per day)`);
-                    }
-                }
-
-                // Ask the database first (it holds the IN / OUT rules). Offline or an older database: the page checks with what it knows.
-                let punchType;
-                let checked = false;
-                let shiftName = null;
-                if (!isOfflineMode && navigator.onLine) {
-                    const chk = await TerminalAPI.checkPunch(currentLabor.labor_id, kind, DateUtils.today(), DateUtils.now());
-                    if (chk.success) {
-                        checked = true;
-                        if (!chk.allowed) {
-                            showStatus('warn', plainRefusal(chk.message) || 'Punch not allowed', '', `<span class="who">${currentLabor.name}</span>`);
-                            scheduleReset(7000);
-                            return;
-                        }
-                        shiftName = chk.shiftName || null;
-                        if (kind === 'logout' && chk.early) {
-                            const leave = await confirmEarlyLeave(currentLabor.name, chk.workedMinutes, chk.requiredMinutes, chk.remainingMinutes);
-                            if (!leave) { resetTerminal(); return; }     // Stay: nothing recorded, back to the start
-                            showStatus('info', 'Saving', '', 'Recording your punch...');
-                        }
-                    }
-                }
-                if (!checked) {
-                    if (isOfflineMode) {
-                        const unsyncedPunches = await OfflineStorage.getUnsyncedPunches();
-                        const todayPunches = unsyncedPunches.filter(p => 
-                            p.laborId === currentLabor.labor_id && p.date === DateUtils.today()
-                        );
-                        const lastPunch = todayPunches[todayPunches.length - 1];
-                        punchType = (!lastPunch || lastPunch.type === 'logout') ? 'login' : 'logout';
-                    } else {
-                        punchType = await TerminalAPI.getNextPunchType(currentLabor.labor_id);
-                    }
-
-                    // The labor pressed IN or OUT: refuse repeated and mismatched punches with a clear message (nothing is recorded)
-                    if (kind === 'login' && punchType === 'logout') {
-                        showStatus('warn', 'Already punched for the day', '', `<span class="who">${currentLabor.name}</span>`);
-                        scheduleReset(7000);
-                        return;
-                    }
-                    // (an OUT is never refused from today's list alone: a night-shift OUT after midnight has no IN today. The database decides.)
-                }
-                punchType = kind;
-                showStatus('info', 'Saving', '', 'Recording your punch...');
+                const punchType = kind;
+                setStep('Saving', 'Recording your punch');
 
                 // Save punch record
                 const now = new Date();
@@ -1213,11 +1210,7 @@ localStorage.setItem('pwa_client_code', clientCode);
                     delete punchData.photoBlob;
 
                     const saveResult = await TerminalAPI.savePunchCompat(punchData);
-                    if (saveResult.rejected) {
-                        showStatus('warn', plainRefusal(saveResult.error) || 'Punch not allowed', '', `<span class="who">${currentLabor.name}</span>`);
-                        scheduleReset(7000);
-                        return;
-                    }
+                    if (saveResult.rejected) return refuse(plainRefusal(saveResult.error) || 'Punch not allowed');
                     if (saveResult.success && saveResult.data && saveResult.data.shift_name) shiftName = saveResult.data.shift_name;
                     if (saveResult.success) keepFaceFresh(currentLabor.labor_id, canvas, detection, confidence, minConfidence);
                     if (!saveResult.success) {
@@ -1228,6 +1221,7 @@ localStorage.setItem('pwa_client_code', clientCode);
                 }
 
                 // Success
+                endSteps();
                 const timeStr = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
                 const chips = (shiftName ? `<span class="chip">${esc(shiftName)}</span>` : '') + `<span class="chip">${esc(currentLocation.name)}</span>`;
 
@@ -1242,6 +1236,7 @@ localStorage.setItem('pwa_client_code', clientCode);
 
             } catch (error) {
                 console.error('Punch error:', error);
+                endSteps();
                 showStatus('error', 'Not recorded', '', error.message);
                 setTimeout(() => {
                     document.getElementById('statusOverlay').classList.remove('active');
@@ -1323,6 +1318,7 @@ localStorage.setItem('pwa_client_code', clientCode);
 
         // Reset terminal (called when a result screen has been shown long enough)
         function resetTerminal() {
+            endSteps();
             currentLabor = null;
             currentLocation = null;
             isPunching = false;
@@ -1637,7 +1633,7 @@ localStorage.setItem('pwa_client_code', clientCode);
             updateLocationBar('Offline mode - Punches will sync later', true);
         });
     </script>
-    <script src="../js/ui/app-update.js?v=108"></script>
-    <script src="../js/ui/pwa-install.js?v=108"></script>
+    <script src="../js/ui/app-update.js?v=109"></script>
+    <script src="../js/ui/pwa-install.js?v=109"></script>
 </body>
 </html>
