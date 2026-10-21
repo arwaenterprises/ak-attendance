@@ -26,6 +26,8 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
       - name: Day rules of the reports (no browser, no database)
         run: node tests/day-rules.test.js
+      - name: Punch checks (GPS, blink; no browser)
+        run: node tests/punch-checks.test.js
       - name: Install browser test tools
         working-directory: tests
         run: |

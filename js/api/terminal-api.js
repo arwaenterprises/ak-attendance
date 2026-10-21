@@ -102,7 +102,8 @@ const TerminalAPI = {
         const { data, error } = await this._rpc('terminal_record_punch', { p: {
             labor_id: punch.laborId, type: punch.type, date: punch.date, time: punch.time,
             location_id: punch.locationId || null, location_name: punch.locationName || null,
-            confidence: punch.confidence == null ? null : Math.round(punch.confidence), photo_url: punch.photoUrl || null
+            confidence: punch.confidence == null ? null : Math.round(punch.confidence), photo_url: punch.photoUrl || null,
+            gps: Array.isArray(punch.gps) ? punch.gps : null      // fresh GPS readings: the database checks the location (migration 024)
         } });
         if (error) return { success: false, error: this._fail(error) };
         // the database refuses repeated / mismatched punches and the 4-hour lock: such a punch is NOT stored

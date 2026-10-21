@@ -12,7 +12,7 @@ Rule for every task: do not break the existing workflow or architecture; test be
 
 ## WHERE WE ARE (updated 2026-10-19; audit findings in section G)
 
-Everything below is **LIVE** (app v107, database migrations 001-022; 023 to be pasted applied on the live project):
+Everything below is **LIVE** (app v108, database migrations 001-022; 023 and 024 to be pasted applied on the live project):
 login through Supabase Auth, one admin per company, closed database (row-level security), punch terminal with its own identity, private punch photos,
 IN / OUT rules (second IN allowed; forgotten OUT does not block the next day; night shift decided by the assigned shift), shifts with history,
 departments with Active / Inactive and moving labors, roles with salary history, platform-owner (client) management, monthly view on the terminal
@@ -296,12 +296,39 @@ Built:
 
 **Live steps for the owner:** 1) paste `supabase/migrations/022_no_half_day.sql` in the Supabase SQL Editor and run it (the last line shows `rows_not_p_or_a = 0`); it may take a moment because it recalculates every day with punches; 2) then merge / push the app (v105); 3) check Settings > Sandwich Rules; 4) open a past month's 3PL and the daily report and compare a few labors.
 
+## H. Fake GPS and photo tricks on mobile punching (2026-10-21)
+
+Owner: mobile punching stays (labors work at places without a tablet); fix fake GPS as far as the website can; build a blink check; no flags, no "suspicious punch" list, no extra work for administrators.
+
+What a website can and cannot do (said to the owner): a website cannot read Android's "this location is fake" mark (only a native app can), so a careful cheater with a good fake GPS app (moving position, realistic accuracy) can still pass. A VPN does not change the GPS position and the punch rules never used the internet address.
+
+| # | Item | Decision | Status |
+|---|------|----------|--------|
+| H1 | The server checks the location itself (before: the phone said "inside" and sent only a location name; an edited page could punch from anywhere) | Go ahead | Done (migration 024) |
+| H2 | Refuse a weak signal (worse than `max_gps_accuracy`, default 100 m: "Weak GPS signal. Please step outside and try again.") and an impossible accuracy (below 1 m) | Go ahead | Done (024, v108) |
+| H3 | 3 readings during the face countdown; exactly the same point 3 times with GPS-grade accuracy (20 m or better) = "Location not found" (Wi-Fi positions indoors are often identical and are NOT refused) | Go ahead, message "Location not found" | Done (024, v108); setting `gps_static_check` to switch off |
+| H4 | Impossible travel between punches | Dropped: the realistic trick (IN at site, OUT from home) is not caught by it | Not built |
+| H5 | Blink check before the photo | Go ahead | Done (v108); setting `blink_check` |
+| H6 | Change the terminal link | No: the link stays; the labor ID + face check is the lock | Not built |
+| H7 | Internet location vs GPS (VPN) | Deferred | Todo (later) |
+| H8-H12 | New device / one phone many labors / photo review / suspicious list / patterns | No (labors share phones; no admin work) | Not built |
+| H13 | Proper Android app (reads the fake-location mark) | Owner asked about it; answer and design in chat 2026-10-21, decisions pending (distribution, blocking browser punches, Play Integrity, iPhones) | Needs your answer |
+
+Built (v108 + migration 024, 2026-10-21):
+- `js/utils/geo-check.js`: 3 fresh readings while the labor lines up with the oval (no extra waiting), same rules as the database for an instant answer and for offline punches. The location is no longer taken from the position read when the page opened (a phone left open kept that old position).
+- `js/utils/liveness.js`: blink = eyes seen open, then closed, then open (eye aspect ratio from the 68 face points face-api.js already finds), 8 seconds to blink, message "Please blink" / "Blink not seen".
+- Migration 024: `_gps_check` + `terminal_record_punch` (011 text + the check); the database picks the punch location (nearest active location of the labor's department, inside its radius) and keeps the best reading (`punch_records.latitude`, `longitude`, `gps_accuracy`). A refused punch is not stored. Changeover: phones on the old app send no readings and are accepted until `gps_required_from` (3 days after the migration, per existing company).
+- Settings page: "Punch Checks" (weakest GPS accepted, refuse a location that does not move, blink check).
+- Tests: `tests/db/gps_check.test.sql` (13 checks), `tests/punch-checks.test.js` (14 checks, in CI), the punch screens checked once in a real browser with a stubbed GPS (identical / weak / far / no blink / OK).
+- Known limits: (1) the blink check runs on the phone, so an edited page could skip it; (2) on a slow phone a very fast blink may be missed ("blink slowly"); (3) two printed photos (eyes open / closed) swapped in front of the camera could pass; (4) NOT tested on a real phone or with a real fake GPS app; (5) an offline punch refused at upload still disappears silently (finding 73).
+
 ---
 
 ## F. Change log
 
 | Date | Change |
 |------|--------|
+| 2026-10-21 | **Fake GPS / photo tricks (v108, migration 024 NOT applied yet; order does not matter).** Server-side location check with fresh GPS readings, weak / impossible / frozen GPS refused, blink check before the photo, three Settings switches. Section H. Database suite passes (13 new checks), punch-checks 14/14, day-rules 11/11, static checks pass. |
 | 2026-10-20 | **Self-enrollment link: "Failed to submit. Please try again." (v107, migration 023 NOT applied yet).** Cause found: the page uploads the photo with overwrite (upsert); Supabase Storage needs SELECT + UPDATE + INSERT to overwrite an existing file (Supabase docs, Storage access control), and migration 006 gave the link only INSERT + UPDATE. So after ONE failed attempt (photo uploaded, submit not finished: weak connection, Retake, link expiring), every retry on that link was refused, and only a new link worked. Not proven on the live logs (no access); the first failure's own cause is not known. Fix: migration 023 lets a pending, unexpired link see its own single photo (tests/db/enrollment_retry.test.sql, 3 checks; database suite passes); the page now says why it failed (expired, already used, no internet, or the real error text). |
 | 2026-10-20 | **Bug fix (v106): "PhotoUtils is not defined" on the administrator's Face Enrollment page (owner report, new client).** Not about the new client: since v91 (2026-10-03) `labor/enroll.html` called `PhotoUtils.makeThumb` (the small photo for Labor Master) without loading `js/utils/photo-utils.js`, so every enrolment from Labor Master failed at "Saving" and nothing was saved (self-enrolment links use another page and were not affected). Fixed by loading the file. New static check: every app object a page's own script uses must be loaded by that page; it also found `dashboard.html` calling `PunchAPI.cleanupOldPhotos` without `punch-api.js` (failed silently on every dashboard visit); that dead in-browser clean-up is removed, the scheduled GitHub workflow keeps deleting old photos. |
 | 2026-10-19 | **No half day, Friday always paid, one set of day rules (v105, migration 022; owner applied 022 on live, then v105 merged to `main`).** Owner decisions in G.5. Fixes findings 62 (local date for "today"), 64-71, 77-79, 81 of the same day's audit. Database suite passes (incl. 17 new checks); approvals already overwritten are repaired, `tests/day-rules.test.js` 11/11, static checks pass. Apply 022 before the app. |

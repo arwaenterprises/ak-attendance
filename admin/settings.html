@@ -307,6 +307,38 @@
                 </div>
             </div>
 
+            <!-- Punch checks (migration 024 / v108) -->
+            <div class="settings-section">
+                <h3>📍 Punch Checks</h3>
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <div class="setting-label">Weakest GPS accepted (metres)</div>
+                        <div class="setting-desc">A punch is refused with "Weak GPS signal" when the phone's GPS is less accurate than this. Default 100</div>
+                    </div>
+                    <input type="number" class="setting-input" id="max_gps_accuracy" min="20" max="1000" step="10" placeholder="100">
+                </div>
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <div class="setting-label">Refuse a location that does not move</div>
+                        <div class="setting-desc">Real GPS always moves a little; many fake GPS apps give exactly the same point. Such a punch is refused with "Location not found". Switch off if honest labors are refused</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="gps_static_check" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <div class="setting-label">Blink check</div>
+                        <div class="setting-desc">The labor must blink before the punch photo, so a printed photo or a photo on another phone is refused</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="blink_check" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
             <!-- Face Recognition -->
             <div class="settings-section">
                 <h3>📸 Face Recognition</h3>
@@ -403,10 +435,10 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- App Scripts -->
-    <script src="../js/config/supabase.js?v=107"></script>
-    <script src="../js/auth/auth.js?v=107"></script>
-    <script src="../js/ui/sync-indicator.js?v=107"></script>
-    <script src="../js/ui/toast.js?v=107"></script>
+    <script src="../js/config/supabase.js?v=108"></script>
+    <script src="../js/auth/auth.js?v=108"></script>
+    <script src="../js/ui/sync-indicator.js?v=108"></script>
+    <script src="../js/ui/toast.js?v=108"></script>
 
     <script>
         // Require Admin
@@ -461,11 +493,14 @@
                 'reenrollment_attempts',
                 'photo_retention_days',
                 'night_shift_start',
-                'night_shift_end'
+                'night_shift_end',
+                'max_gps_accuracy'
             ];
             const togglesToSave = [
                 'sandwich_rule_friday',
-                'sandwich_rule_nh'
+                'sandwich_rule_nh',
+                'gps_static_check',
+                'blink_check'
             ];
             const clientId = AUTH.getClientId();
 
@@ -484,6 +519,7 @@
                     const input = document.getElementById(key);
                     if (!input) continue;
                     const newValue = input.value;
+                    if (newValue === '' && originalSettings[key] === undefined) continue;     // never set and left empty: the default applies
                     if (newValue !== originalSettings[key]) {
                         const { error } = await supabaseClient
                             .from('settings')
@@ -676,6 +712,6 @@
         loadSettings();
         loadHolidays();
     </script>
-    <script src="../js/ui/app-update.js?v=107"></script>
+    <script src="../js/ui/app-update.js?v=108"></script>
 </body>
 </html>

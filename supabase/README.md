@@ -2,11 +2,11 @@
 
 | File / folder | What it is |
 |---|---|
-| `migrations/001 ... 023` | The database changes, in order. Each one is pasted once into the Supabase SQL Editor of the live project. This is the real history of the database. |
+| `migrations/001 ... 024` | The database changes, in order. Each one is pasted once into the Supabase SQL Editor of the live project. This is the real history of the database. |
 | `schema.sql` | The original tables before migration 001 (starting point for rebuilding a database from nothing; the tests do this). |
 | `policies-temporary-open.sql` | The old open access rules that migration 001 replaces (only needed for the same rebuild). |
 
-Rebuild from nothing (this is what `bash tests/db/run.sh` does on a throw-away Postgres): `schema.sql`, `policies-temporary-open.sql`, then `migrations/001` to `023` in number order.
+Rebuild from nothing (this is what `bash tests/db/run.sh` does on a throw-away Postgres): `schema.sql`, `policies-temporary-open.sql`, then `migrations/001` to `024` in number order.
 
 The tests for every migration are in `tests/db/`.
 
