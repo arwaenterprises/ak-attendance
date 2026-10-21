@@ -12,7 +12,7 @@ Rule for every task: do not break the existing workflow or architecture; test be
 
 ## WHERE WE ARE (updated 2026-10-19; audit findings in section G)
 
-Everything below is **LIVE** (app v108, database migrations 001-024 applied on the live project applied on the live project):
+Everything below is **LIVE** (app v108, database migrations 001-024 applied on the live project):
 login through Supabase Auth, one admin per company, closed database (row-level security), punch terminal with its own identity, private punch photos,
 IN / OUT rules (second IN allowed; forgotten OUT does not block the next day; night shift decided by the assigned shift), shifts with history,
 departments with Active / Inactive and moving labors, roles with salary history, platform-owner (client) management, monthly view on the terminal
